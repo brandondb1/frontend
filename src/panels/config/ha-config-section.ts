@@ -13,6 +13,7 @@ export class HaConfigSection extends LitElement {
         })}"
       >
         <div class="header"><slot name="header"></slot></div>
+        <div class="intro"><slot name="introduction"></slot></div>
         <div
           class="together layout ${classMap({
             narrow: !this.isWide,
@@ -20,7 +21,6 @@ export class HaConfigSection extends LitElement {
             horizontal: this.isWide,
           })}"
         >
-          <div class="intro"><slot name="introduction"></slot></div>
           <div class="panel flex-auto"><slot></slot></div>
         </div>
       </div>
@@ -64,6 +64,7 @@ export class HaConfigSection extends LitElement {
         letter-spacing: var(--paper-font-headline_-_letter-spacing);
         line-height: var(--paper-font-headline_-_line-height);
         opacity: var(--dark-primary-opacity);
+        padding-bottom: 8px;
       }
 
       .together {
@@ -78,7 +79,6 @@ export class HaConfigSection extends LitElement {
         font-weight: var(--paper-font-subhead_-_font-weight);
         line-height: var(--paper-font-subhead_-_line-height);
         width: 100%;
-        max-width: 400px;
         margin-right: 40px;
         opacity: var(--dark-primary-opacity);
         font-size: 14px;
@@ -86,7 +86,7 @@ export class HaConfigSection extends LitElement {
       }
 
       .panel {
-        margin-top: -24px;
+        margin-top: -48px;
       }
 
       .panel ::slotted(*) {
