@@ -1,13 +1,13 @@
-import "../../../components/ha-icon-button";
+import { mdiDotsVertical } from "@mdi/js";
 import "@thomasloven/round-slider";
 import {
   css,
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
@@ -20,26 +20,24 @@ import { computeStateName } from "../../../common/entity/compute_state_name";
 import { stateIcon } from "../../../common/entity/state_icon";
 import { supportsFeature } from "../../../common/entity/supports-feature";
 import "../../../components/ha-card";
-import { UNAVAILABLE_STATES } from "../../../data/entity";
-import { SUPPORT_BRIGHTNESS } from "../../../data/light";
+import "../../../components/ha-icon-button";
+import { UNAVAILABLE, UNAVAILABLE_STATES } from "../../../data/entity";
+import { LightEntity, SUPPORT_BRIGHTNESS } from "../../../data/light";
 import { ActionHandlerEvent } from "../../../data/lovelace";
-import { HomeAssistant, LightEntity } from "../../../types";
+import { HomeAssistant } from "../../../types";
 import { actionHandler } from "../common/directives/action-handler-directive";
-import { findEntities } from "../common/find-entites";
+import { findEntities } from "../common/find-entities";
 import { handleAction } from "../common/handle-action";
 import { hasAction } from "../common/has-action";
 import { hasConfigOrEntityChanged } from "../common/has-changed";
 import { createEntityNotFoundWarning } from "../components/hui-warning";
 import { LovelaceCard, LovelaceCardEditor } from "../types";
 import { LightCardConfig } from "./types";
-import { mdiDotsVertical } from "@mdi/js";
 
 @customElement("hui-light-card")
 export class HuiLightCard extends LitElement implements LovelaceCard {
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
-    await import(
-      /* webpackChunkName: "hui-light-card-editor" */ "../editor/config-elements/hui-light-card-editor"
-    );
+    await import("../editor/config-elements/hui-light-card-editor");
     return document.createElement("hui-light-card-editor");
   }
 
@@ -68,17 +66,18 @@ export class HuiLightCard extends LitElement implements LovelaceCard {
   private _brightnessTimout?: number;
 
   public getCardSize(): number {
-    return 4;
+    return 5;
   }
 
   public setConfig(config: LightCardConfig): void {
     if (!config.entity || config.entity.split(".")[0] !== "light") {
-      throw new Error("Specify an entity from within the light domain.");
+      throw new Error("Specify an entity from within the light domain");
     }
 
     this._config = {
-      ...config,
       tap_action: { action: "toggle" },
+      hold_action: { action: "more-info" },
+      ...config,
     };
   }
 
@@ -98,7 +97,7 @@ export class HuiLightCard extends LitElement implements LovelaceCard {
     }
 
     const brightness =
-      Math.round((stateObj.attributes.brightness / 254) * 100) || 0;
+      Math.round((stateObj.attributes.brightness / 255) * 100) || 0;
 
     return html`
       <ha-card>
@@ -115,7 +114,8 @@ export class HuiLightCard extends LitElement implements LovelaceCard {
           <div id="controls">
             <div id="slider">
               <round-slider
-                min="0"
+                min="1"
+                max="100"
                 .value=${brightness}
                 .disabled=${UNAVAILABLE_STATES.includes(stateObj.state)}
                 @value-changing=${this._dragEvent}
@@ -133,7 +133,7 @@ export class HuiLightCard extends LitElement implements LovelaceCard {
                     SUPPORT_BRIGHTNESS
                   ),
                   "state-on": stateObj.state === "on",
-                  "state-unavailable": stateObj.state === "unavailable",
+                  "state-unavailable": stateObj.state === UNAVAILABLE,
                 })}"
                 .icon=${this._config.icon || stateIcon(stateObj)}
                 .disabled=${UNAVAILABLE_STATES.includes(stateObj.state)}
@@ -266,10 +266,6 @@ export class HuiLightCard extends LitElement implements LovelaceCard {
 
   static get styles(): CSSResult {
     return css`
-      :host {
-        display: block;
-      }
-
       ha-card {
         height: 100%;
         box-sizing: border-box;

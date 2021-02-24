@@ -32,7 +32,7 @@ class MoreInfoPerson extends LitElement {
     return html`
       <ha-attributes
         .stateObj=${this.stateObj}
-        extraFilters="id,user_id,editable"
+        extra-filters="id,user_id,editable"
       ></ha-attributes>
       ${this.stateObj.attributes.latitude && this.stateObj.attributes.longitude
         ? html`
@@ -75,8 +75,11 @@ class MoreInfoPerson extends LitElement {
         justify-content: space-between;
       }
       .actions {
-        margin: 36px 0 8px 0;
+        margin: 8px 0;
         text-align: right;
+      }
+      ha-map {
+        margin-top: 16px;
       }
     `;
   }

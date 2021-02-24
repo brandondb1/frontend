@@ -1,22 +1,21 @@
+import { mdiDelete } from "@mdi/js";
 import "@polymer/paper-input/paper-input";
+import "@polymer/paper-listbox/paper-listbox";
 import {
+  css,
+  CSSResult,
   customElement,
   LitElement,
   property,
-  CSSResult,
-  css,
 } from "lit-element";
 import { html } from "lit-html";
-import { Action, ChooseAction } from "../../../../../data/script";
-import { HomeAssistant } from "../../../../../types";
-import { ActionElement } from "../ha-automation-action-row";
-import "../../condition/ha-automation-condition-editor";
-import "@polymer/paper-listbox/paper-listbox";
 import { fireEvent } from "../../../../../common/dom/fire_event";
-import "../ha-automation-action";
 import { Condition } from "../../../../../data/automation";
+import { Action, ChooseAction } from "../../../../../data/script";
 import { haStyle } from "../../../../../resources/styles";
-import { mdiDelete } from "@mdi/js";
+import { HomeAssistant } from "../../../../../types";
+import "../ha-automation-action";
+import { ActionElement } from "../ha-automation-action-row";
 
 @customElement("ha-automation-action-choose")
 export class HaChooseAction extends LitElement implements ActionElement {
@@ -41,7 +40,7 @@ export class HaChooseAction extends LitElement implements ActionElement {
               "ui.panel.config.automation.editor.actions.type.choose.remove_option"
             )}
           >
-            <ha-svg-icon path=${mdiDelete}></ha-svg-icon>
+            <ha-svg-icon .path=${mdiDelete}></ha-svg-icon>
           </mwc-icon-button>
           <div class="card-content">
             <h2>

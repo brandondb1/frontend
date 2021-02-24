@@ -1,21 +1,23 @@
-import { derivedStyles, darkStyles } from "../../resources/styles";
-import { HomeAssistant, Theme } from "../../types";
+import { Theme } from "../../data/ws-themes";
+import { darkStyles, derivedStyles } from "../../resources/styles";
+import type { HomeAssistant } from "../../types";
 import {
   hex2rgb,
+  lab2hex,
+  lab2rgb,
   rgb2hex,
   rgb2lab,
-  lab2rgb,
-  lab2hex,
 } from "../color/convert-color";
+import { hexBlend } from "../color/hex";
+import { labBrighten, labDarken } from "../color/lab";
 import { rgbContrast } from "../color/rgb";
-import { labDarken, labBrighten } from "../color/lab";
 
 interface ProcessedTheme {
   keys: { [key: string]: "" };
-  styles: { [key: string]: string };
+  styles: Record<string, string>;
 }
 
-let PROCESSED_THEMES: { [key: string]: ProcessedTheme } = {};
+let PROCESSED_THEMES: Record<string, ProcessedTheme> = {};
 
 /**
  * Apply a theme to an element by setting the CSS variables on it.
@@ -37,6 +39,13 @@ export const applyThemesOnElement = (
     if (themeOptions.dark) {
       cacheKey = `${cacheKey}__dark`;
       themeRules = darkStyles;
+      if (themeOptions.primaryColor) {
+        themeRules["app-header-background-color"] = hexBlend(
+          themeOptions.primaryColor,
+          "#121212",
+          8
+        );
+      }
     }
     if (themeOptions.primaryColor) {
       cacheKey = `${cacheKey}__primary_${themeOptions.primaryColor}`;
@@ -105,7 +114,7 @@ const processTheme = (
   const keys = {};
   for (const key of Object.keys(combinedTheme)) {
     const prefixedKey = `--${key}`;
-    const value = combinedTheme[key]!;
+    const value = String(combinedTheme[key]);
     styles[prefixedKey] = value;
     keys[prefixedKey] = "";
 

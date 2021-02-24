@@ -1,14 +1,20 @@
-import "@polymer/paper-dialog-scrollable/paper-dialog-scrollable";
+import "@material/mwc-icon-button/mwc-icon-button";
+import { mdiClose, mdiContentCopy } from "@mdi/js";
+import "@polymer/paper-tooltip/paper-tooltip";
 import {
   css,
   CSSResult,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   TemplateResult,
 } from "lit-element";
-import "../../../components/dialog/ha-paper-dialog";
+import { fireEvent } from "../../../common/dom/fire_event";
+import { copyToClipboard } from "../../../common/util/copy-clipboard";
+import "../../../components/ha-dialog";
+import "../../../components/ha-header-bar";
+import "../../../components/ha-svg-icon";
 import {
   domainToName,
   fetchIntegrationManifest,
@@ -16,12 +22,11 @@ import {
   IntegrationManifest,
 } from "../../../data/integration";
 import { getLoggedErrorIntegration } from "../../../data/system_log";
-import { PolymerChangedEvent } from "../../../polymer-types";
 import { haStyleDialog } from "../../../resources/styles";
-import { HomeAssistant } from "../../../types";
-import { SystemLogDetailDialogParams } from "./show-dialog-system-log-detail";
+import type { HomeAssistant } from "../../../types";
+import { showToast } from "../../../util/toast";
+import type { SystemLogDetailDialogParams } from "./show-dialog-system-log-detail";
 import { formatSystemLogTime } from "./util";
-import { fireEvent } from "../../../common/dom/fire_event";
 
 class DialogSystemLogDetail extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
@@ -61,19 +66,23 @@ class DialogSystemLogDetail extends LitElement {
     const integration = getLoggedErrorIntegration(item);
 
     return html`
-      <ha-paper-dialog
-        with-backdrop
-        opened
-        @opened-changed="${this._openedChanged}"
-      >
-        <h2>
-          ${this.hass.localize(
-            "ui.panel.config.logs.details",
-            "level",
-            item.level
-          )}
-        </h2>
-        <paper-dialog-scrollable>
+      <ha-dialog open @closed=${this.closeDialog} hideActions heading=${true}>
+        <ha-header-bar slot="heading">
+          <mwc-icon-button slot="navigationIcon" dialogAction="cancel">
+            <ha-svg-icon .path=${mdiClose}></ha-svg-icon>
+          </mwc-icon-button>
+          <span slot="title">
+            ${this.hass.localize(
+              "ui.panel.config.logs.details",
+              "level",
+              item.level
+            )}
+          </span>
+          <mwc-icon-button id="copy" @click=${this._copyLog} slot="actionItems">
+            <ha-svg-icon .path=${mdiContentCopy}></ha-svg-icon>
+          </mwc-icon-button>
+        </ha-header-bar>
+        <div class="contents">
           <p>
             Logger: ${item.name}<br />
             Source: ${item.source.join(":")}
@@ -129,8 +138,8 @@ class DialogSystemLogDetail extends LitElement {
               `
             : item.message[0]}
           ${item.exception ? html` <pre>${item.exception}</pre> ` : html``}
-        </paper-dialog-scrollable>
-      </ha-paper-dialog>
+        </div>
+      </ha-dialog>
     `;
   }
 
@@ -142,19 +151,21 @@ class DialogSystemLogDetail extends LitElement {
     }
   }
 
-  private _openedChanged(ev: PolymerChangedEvent<boolean>): void {
-    if (!(ev.detail as any).value) {
-      this.closeDialog();
-    }
+  private async _copyLog(): Promise<void> {
+    const copyElement = this.shadowRoot?.querySelector(
+      ".contents"
+    ) as HTMLElement;
+
+    await copyToClipboard(copyElement.innerText);
+    showToast(this, {
+      message: this.hass.localize("ui.common.copied_clipboard"),
+    });
   }
 
   static get styles(): CSSResult[] {
     return [
       haStyleDialog,
       css`
-        ha-paper-dialog {
-          direction: ltr;
-        }
         a {
           color: var(--primary-color);
         }
@@ -163,6 +174,21 @@ class DialogSystemLogDetail extends LitElement {
         }
         pre {
           margin-bottom: 0;
+          font-family: var(--code-font-family, monospace);
+        }
+
+        ha-header-bar {
+          --mdc-theme-on-primary: var(--primary-text-color);
+          --mdc-theme-primary: var(--mdc-theme-surface);
+          flex-shrink: 0;
+          border-bottom: 1px solid
+            var(--mdc-dialog-scroll-divider-color, rgba(0, 0, 0, 0.12));
+        }
+
+        @media all and (min-width: 451px) and (min-height: 501px) {
+          ha-dialog {
+            --mdc-dialog-max-width: 90vw;
+          }
         }
       `,
     ];

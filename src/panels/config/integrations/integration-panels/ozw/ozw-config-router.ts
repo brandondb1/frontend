@@ -1,10 +1,23 @@
 import { customElement, property } from "lit-element";
+import memoizeOne from "memoize-one";
 import {
   HassRouterPage,
   RouterOptions,
 } from "../../../../../layouts/hass-router-page";
-import { HomeAssistant } from "../../../../../types";
-import { navigate } from "../../../../../common/navigate";
+import { HomeAssistant, Route } from "../../../../../types";
+
+export const computeTail = memoizeOne((route: Route) => {
+  const dividerPos = route.path.indexOf("/", 1);
+  return dividerPos === -1
+    ? {
+        prefix: route.prefix + route.path,
+        path: "",
+      }
+    : {
+        prefix: route.prefix + route.path.substr(0, dividerPos),
+        path: route.path.substr(dividerPos),
+      };
+});
 
 @customElement("ozw-config-router")
 class OZWConfigRouter extends HassRouterPage {
@@ -24,17 +37,11 @@ class OZWConfigRouter extends HassRouterPage {
     routes: {
       dashboard: {
         tag: "ozw-config-dashboard",
-        load: () =>
-          import(
-            /* webpackChunkName: "ozw-config-dashboard" */ "./ozw-config-dashboard"
-          ),
+        load: () => import("./ozw-config-dashboard"),
       },
       network: {
-        tag: "ozw-config-network",
-        load: () =>
-          import(
-            /* webpackChunkName: "ozw-config-network" */ "./ozw-config-network"
-          ),
+        tag: "ozw-network-router",
+        load: () => import("./ozw-network-router"),
       },
     },
   };
@@ -46,19 +53,9 @@ class OZWConfigRouter extends HassRouterPage {
     el.narrow = this.narrow;
     el.configEntryId = this._configEntry;
     if (this._currentPage === "network") {
-      el.ozw_instance = this.routeTail.path.substr(1);
-    }
-
-    const searchParams = new URLSearchParams(window.location.search);
-    if (this._configEntry && !searchParams.has("config_entry")) {
-      searchParams.append("config_entry", this._configEntry);
-      navigate(
-        this,
-        `${this.routeTail.prefix}${
-          this.routeTail.path
-        }?${searchParams.toString()}`,
-        true
-      );
+      const path = this.routeTail.path.split("/");
+      el.ozwInstance = path[1];
+      el.route = computeTail(this.routeTail);
     }
   }
 }

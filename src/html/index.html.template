@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <% if (!useWDS) { %>
     <link rel="preload" href="<%= latestCoreJS %>" as="script" crossorigin="use-credentials" />
     <link rel="preload" href="<%= latestAppJS %>" as="script" crossorigin="use-credentials" />
+    <% } %>
     <%= renderTemplate('_header') %>
     <title>Home Assistant</title>
     <link rel="mask-icon" href="/static/icons/mask-icon.svg" color="#03a9f4" />
@@ -40,7 +42,7 @@
       #ha-init-skeleton::before {
         display: block;
         content: "";
-        height: 112px;
+        height: 56px;
         background-color: #THEMEC;
       }
       html {
@@ -48,7 +50,7 @@
       }
       @media (prefers-color-scheme: dark) {
         html {
-          background-color: var(--primary-background-color, #111111);
+          background-color: #111111;
         }
         #ha-init-skeleton::before {
           background-color: #1c1c1c;
@@ -63,7 +65,7 @@
     <%= renderTemplate('_js_base') %>
     <%= renderTemplate('_preload_roboto') %>
 
-    <script crossorigin="use-credentials">
+    <script <% if (!useWDS) { %>crossorigin="use-credentials"<% } %>>
       import("<%= latestCoreJS %>");
       import("<%= latestAppJS %>");
       window.customPanelJS = "<%= latestCustomPanelJS %>";
@@ -100,9 +102,5 @@
         {% endfor -%}
       }
     </script>
-
-    {% for extra_url in extra_urls -%}
-    <link rel="import" href="{{ extra_url }}" async />
-    {% endfor -%}
   </body>
 </html>

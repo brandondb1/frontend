@@ -6,12 +6,13 @@ import { html } from "@polymer/polymer/lib/utils/html-tag";
 import { PolymerElement } from "@polymer/polymer/polymer-element";
 import { computeStateDomain } from "../../../common/entity/compute_state_domain";
 import LocalizeMixin from "../../../mixins/localize-mixin";
-import hassAttributeUtil from "../../../util/hass-attributes-util";
-import "./ha-form-customize-attributes";
-import "../ha-form-style";
 import "../../../styles/polymer-ha-style";
+import { documentationUrl } from "../../../util/documentation-url";
+import hassAttributeUtil from "../../../util/hass-attributes-util";
+import "../ha-form-style";
+import "./ha-form-customize-attributes";
 
-class HaFormCustomize extends LocalizeMixin(PolymerElement) {
+export class HaFormCustomize extends LocalizeMixin(PolymerElement) {
   static get template() {
     return html`
       <style include="iron-flex ha-style ha-form-style">
@@ -30,7 +31,7 @@ class HaFormCustomize extends LocalizeMixin(PolymerElement) {
         <div class="warning">
           [[localize('ui.panel.config.customize.warning.include_sentence')]]
           <a
-            href="https://www.home-assistant.io/docs/configuration/customizing-devices/#customization-using-the-ui"
+            href="[[_computeDocumentationUrl(hass)]]"
             target="_blank"
             rel="noreferrer"
             >[[localize('ui.panel.config.customize.warning.include_link')]]</a
@@ -39,59 +40,61 @@ class HaFormCustomize extends LocalizeMixin(PolymerElement) {
         </div>
       </template>
       <template is="dom-if" if="[[hasLocalAttributes]]">
-        <h4 class="attributes-text">
+        <p class="attributes-text">
           [[localize('ui.panel.config.customize.attributes_customize')]]<br />
-        </h4>
+        </p>
         <ha-form-customize-attributes
           attributes="{{localAttributes}}"
         ></ha-form-customize-attributes>
       </template>
       <template is="dom-if" if="[[hasGlobalAttributes]]">
-        <h4 class="attributes-text">
+        <p class="attributes-text">
           [[localize('ui.panel.config.customize.attributes_outside')]]<br />
           [[localize('ui.panel.config.customize.different_include')]]
-        </h4>
+        </p>
         <ha-form-customize-attributes
           attributes="{{globalAttributes}}"
         ></ha-form-customize-attributes>
       </template>
       <template is="dom-if" if="[[hasExistingAttributes]]">
-        <h4 class="attributes-text">
+        <p class="attributes-text">
           [[localize('ui.panel.config.customize.attributes_set')]]<br />
           [[localize('ui.panel.config.customize.attributes_override')]]
-        </h4>
+        </p>
         <ha-form-customize-attributes
           attributes="{{existingAttributes}}"
         ></ha-form-customize-attributes>
       </template>
       <template is="dom-if" if="[[hasNewAttributes]]">
-        <h4 class="attributes-text">
+        <p class="attributes-text">
           [[localize('ui.panel.config.customize.attributes_not_set')]]
-        </h4>
+        </p>
         <ha-form-customize-attributes
           attributes="{{newAttributes}}"
         ></ha-form-customize-attributes>
       </template>
-      <div class="form-group">
-        <paper-dropdown-menu
-          label="[[localize('ui.panel.config.customize.pick_attribute')]]"
-          class="flex"
-          dynamic-align=""
-        >
-          <paper-listbox
-            slot="dropdown-content"
-            selected="{{selectedNewAttribute}}"
+      <template is="dom-if" if="[[entity]]">
+        <div class="form-group">
+          <paper-dropdown-menu
+            label="[[localize('ui.panel.config.customize.pick_attribute')]]"
+            class="flex"
+            dynamic-align=""
           >
-            <template
-              is="dom-repeat"
-              items="[[newAttributesOptions]]"
-              as="option"
+            <paper-listbox
+              slot="dropdown-content"
+              selected="{{selectedNewAttribute}}"
             >
-              <paper-item>[[option]]</paper-item>
-            </template>
-          </paper-listbox>
-        </paper-dropdown-menu>
-      </div>
+              <template
+                is="dom-repeat"
+                items="[[newAttributesOptions]]"
+                as="option"
+              >
+                <paper-item>[[option]]</paper-item>
+              </template>
+            </paper-listbox>
+          </paper-dropdown-menu>
+        </div>
+      </template>
     `;
   }
 
@@ -207,6 +210,13 @@ class HaFormCustomize extends LocalizeMixin(PolymerElement) {
   _computeAttributes(config, keys, secondary) {
     return keys.map((key) =>
       this._computeSingleAttribute(key, config[key], secondary)
+    );
+  }
+
+  _computeDocumentationUrl(hass) {
+    return documentationUrl(
+      hass,
+      "/docs/configuration/customizing-devices/#customization-using-the-ui"
     );
   }
 

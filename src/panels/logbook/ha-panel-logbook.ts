@@ -1,33 +1,33 @@
+import { mdiRefresh } from "@mdi/js";
 import "@polymer/app-layout/app-header/app-header";
 import "@polymer/app-layout/app-toolbar/app-toolbar";
-import "../../components/ha-icon-button";
-import "../../components/ha-circular-progress";
-import { computeRTL } from "../../common/util/compute_rtl";
-import "../../components/entity/ha-entity-picker";
-import "../../components/ha-menu-button";
-import "../../layouts/ha-app-layout";
-import "./ha-logbook";
 import {
-  LitElement,
-  property,
-  internalProperty,
+  css,
   customElement,
   html,
-  css,
+  internalProperty,
+  LitElement,
+  property,
   PropertyValues,
 } from "lit-element";
-import { HomeAssistant } from "../../types";
-import { haStyle } from "../../resources/styles";
-import { fetchUsers } from "../../data/user";
-import { fetchPersons } from "../../data/person";
+import { computeRTL } from "../../common/util/compute_rtl";
+import "../../components/entity/ha-entity-picker";
+import "../../components/ha-circular-progress";
+import "../../components/ha-date-range-picker";
+import type { DateRangePickerRanges } from "../../components/ha-date-range-picker";
+import "../../components/ha-icon-button";
+import "../../components/ha-menu-button";
 import {
   clearLogbookCache,
   getLogbookData,
   LogbookEntry,
 } from "../../data/logbook";
-import { mdiRefresh } from "@mdi/js";
-import "../../components/ha-date-range-picker";
-import type { DateRangePickerRanges } from "../../components/ha-date-range-picker";
+import { fetchPersons } from "../../data/person";
+import { fetchUsers } from "../../data/user";
+import "../../layouts/ha-app-layout";
+import { haStyle } from "../../resources/styles";
+import { HomeAssistant } from "../../types";
+import "./ha-logbook";
 
 @customElement("ha-panel-logbook")
 export class HaPanelLogbook extends LitElement {
@@ -86,7 +86,7 @@ export class HaPanelLogbook extends LitElement {
               @click=${this._refreshLogbook}
               .disabled=${this._isLoading}
             >
-              <ha-svg-icon path=${mdiRefresh}></ha-svg-icon>
+              <ha-svg-icon .path=${mdiRefresh}></ha-svg-icon>
             </mwc-icon-button>
           </app-toolbar>
         </app-header>
@@ -115,17 +115,22 @@ export class HaPanelLogbook extends LitElement {
         </div>
 
         ${this._isLoading
-          ? html`<div class="progress-wrapper">
-              <ha-circular-progress
-                active
-                alt=${this.hass.localize("ui.common.loading")}
-              ></ha-circular-progress>
-            </div>`
-          : html`<ha-logbook
-              .hass=${this.hass}
-              .entries=${this._entries}
-              .userIdToName=${this._userIdToName}
-            ></ha-logbook>`}
+          ? html`
+              <div class="progress-wrapper">
+                <ha-circular-progress
+                  active
+                  alt=${this.hass.localize("ui.common.loading")}
+                ></ha-circular-progress>
+              </div>
+            `
+          : html`
+              <ha-logbook
+                .hass=${this.hass}
+                .entries=${this._entries}
+                .userIdToName=${this._userIdToName}
+                virtualize
+              ></ha-logbook>
+            `}
       </ha-app-layout>
     `;
   }
@@ -142,27 +147,21 @@ export class HaPanelLogbook extends LitElement {
     todayEnd.setDate(todayEnd.getDate() + 1);
     todayEnd.setMilliseconds(todayEnd.getMilliseconds() - 1);
 
-    const todayCopy = new Date(today);
-
-    const yesterday = new Date(todayCopy.setDate(today.getDate() - 1));
-    const yesterdayEnd = new Date(yesterday);
-    yesterdayEnd.setDate(yesterdayEnd.getDate() + 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayEnd = new Date(today);
     yesterdayEnd.setMilliseconds(yesterdayEnd.getMilliseconds() - 1);
 
-    const thisWeekStart = new Date(
-      todayCopy.setDate(today.getDate() - today.getDay())
-    );
-    const thisWeekEnd = new Date(
-      todayCopy.setDate(thisWeekStart.getDate() + 7)
-    );
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - today.getDay());
+    const thisWeekEnd = new Date(thisWeekStart);
+    thisWeekEnd.setDate(thisWeekStart.getDate() + 7);
     thisWeekEnd.setMilliseconds(thisWeekEnd.getMilliseconds() - 1);
 
-    const lastWeekStart = new Date(
-      todayCopy.setDate(today.getDate() - today.getDay() - 7)
-    );
-    const lastWeekEnd = new Date(
-      todayCopy.setDate(lastWeekStart.getDate() + 7)
-    );
+    const lastWeekStart = new Date(today);
+    lastWeekStart.setDate(today.getDate() - today.getDay() - 7);
+    const lastWeekEnd = new Date(lastWeekStart);
+    lastWeekEnd.setDate(lastWeekStart.getDate() + 7);
     lastWeekEnd.setMilliseconds(lastWeekEnd.getMilliseconds() - 1);
 
     this._ranges = {
@@ -267,6 +266,7 @@ export class HaPanelLogbook extends LitElement {
       ),
       this._fetchUserDone,
     ]);
+
     // Fixed in TS 3.9 but upgrade out of scope for this PR.
     // @ts-ignore
     this._entries = entries;
@@ -321,9 +321,6 @@ export class HaPanelLogbook extends LitElement {
           display: inline-block;
           flex-grow: 1;
           max-width: 400px;
-          --paper-input-suffix: {
-            height: 24px;
-          }
         }
 
         :host([narrow]) ha-entity-picker {

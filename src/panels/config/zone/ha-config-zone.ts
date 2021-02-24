@@ -1,4 +1,4 @@
-import "@material/mwc-fab";
+import "../../../components/ha-fab";
 import "@material/mwc-icon-button";
 import { mdiPencil, mdiPencilOff, mdiPlus } from "@mdi/js";
 import "@polymer/paper-item/paper-icon-item";
@@ -11,9 +11,9 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   query,
   TemplateResult,
@@ -198,7 +198,7 @@ export class HaConfigZone extends SubscribeMixin(LitElement) {
                             : mdiPencilOff}
                         ></ha-svg-icon>
                       </mwc-icon-button>
-                      <paper-tooltip position="left">
+                      <paper-tooltip animation-delay="0" position="left">
                         ${state.entity_id === "zone.home"
                           ? this.hass.localize(
                               `ui.panel.config.zone.${
@@ -255,13 +255,14 @@ export class HaConfigZone extends SubscribeMixin(LitElement) {
               </div>
             `
           : ""}
-        <mwc-fab
+        <ha-fab
           slot="fab"
-          title=${hass.localize("ui.panel.config.zone.add_zone")}
+          .label=${hass.localize("ui.panel.config.zone.add_zone")}
+          extended
           @click=${this._createZone}
         >
-          <ha-svg-icon slot="icon" path=${mdiPlus}></ha-svg-icon>
-        </mwc-fab>
+          <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+        </ha-fab>
       </hass-tabs-subpage>
     `;
   }
@@ -440,9 +441,8 @@ export class HaConfigZone extends SubscribeMixin(LitElement) {
     if (
       !(await showConfirmationDialog(this, {
         title: this.hass!.localize("ui.panel.config.zone.confirm_delete"),
-        text: this.hass!.localize("ui.panel.config.zone.confirm_delete2"),
-        dismissText: this.hass!.localize("ui.common.no"),
-        confirmText: this.hass!.localize("ui.common.yes"),
+        dismissText: this.hass!.localize("ui.common.cancel"),
+        confirmText: this.hass!.localize("ui.common.delete"),
       }))
     ) {
       return false;

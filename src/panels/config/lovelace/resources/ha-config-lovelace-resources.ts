@@ -1,15 +1,14 @@
+import { mdiPlus } from "@mdi/js";
 import "@polymer/paper-checkbox/paper-checkbox";
 import "@polymer/paper-dropdown-menu/paper-dropdown-menu";
 import "@polymer/paper-item/paper-icon-item";
 import "@polymer/paper-listbox/paper-listbox";
-import "@polymer/paper-tooltip/paper-tooltip";
-import "@material/mwc-fab";
 import {
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
@@ -19,7 +18,9 @@ import {
   DataTableColumnContainer,
   RowClickedEvent,
 } from "../../../../components/data-table/ha-data-table";
+import "../../../../components/ha-fab";
 import "../../../../components/ha-icon";
+import "../../../../components/ha-svg-icon";
 import {
   createResource,
   deleteResource,
@@ -37,8 +38,6 @@ import { HomeAssistant, Route } from "../../../../types";
 import { loadLovelaceResources } from "../../../lovelace/common/load-resources";
 import { lovelaceTabs } from "../ha-config-lovelace";
 import { showResourceDetailDialog } from "./show-dialog-lovelace-resource-detail";
-import "../../../../components/ha-svg-icon";
-import { mdiPlus } from "@mdi/js";
 
 @customElement("ha-config-lovelace-resources")
 export class HaConfigLovelaceRescources extends LitElement {
@@ -102,16 +101,18 @@ export class HaConfigLovelaceRescources extends LitElement {
         )}
         @row-click=${this._editResource}
         hasFab
+        clickable
       >
-        <mwc-fab
+        <ha-fab
           slot="fab"
-          title=${this.hass.localize(
+          .label=${this.hass.localize(
             "ui.panel.config.lovelace.resources.picker.add_resource"
           )}
+          extended
           @click=${this._addResource}
         >
-          <ha-svg-icon slot="icon" path=${mdiPlus}></ha-svg-icon>
-        </mwc-fab>
+          <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+        </ha-fab>
       </hass-tabs-subpage-data-table>
     `;
   }
@@ -189,6 +190,8 @@ export class HaConfigLovelaceRescources extends LitElement {
             text: this.hass!.localize(
               "ui.panel.config.lovelace.resources.refresh_body"
             ),
+            confirmText: this.hass.localize("ui.common.refresh"),
+            dismissText: this.hass.localize("ui.common.not_now"),
             confirm: () => location.reload(),
           });
           return true;

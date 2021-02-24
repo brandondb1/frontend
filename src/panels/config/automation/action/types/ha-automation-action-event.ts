@@ -7,6 +7,7 @@ import {
   query,
 } from "lit-element";
 import { html } from "lit-html";
+import { fireEvent } from "../../../../../common/dom/fire_event";
 import "../../../../../components/entity/ha-entity-picker";
 import "../../../../../components/ha-service-picker";
 import "../../../../../components/ha-yaml-editor";
@@ -21,7 +22,7 @@ export class HaEventAction extends LitElement implements ActionElement {
 
   @property() public action!: EventAction;
 
-  @query("ha-yaml-editor") private _yamlEditor?: HaYamlEditor;
+  @query("ha-yaml-editor", true) private _yamlEditor?: HaYamlEditor;
 
   private _actionData?: EventAction["event_data"];
 
@@ -51,7 +52,7 @@ export class HaEventAction extends LitElement implements ActionElement {
         )}
         name="event"
         .value=${event}
-        @value-changed=${this._valueChanged}
+        @value-changed=${this._eventChanged}
       ></paper-input>
       <ha-yaml-editor
         .label=${this.hass.localize(
@@ -73,8 +74,11 @@ export class HaEventAction extends LitElement implements ActionElement {
     handleChangeEvent(this, ev);
   }
 
-  private _valueChanged(ev: CustomEvent): void {
-    handleChangeEvent(this, ev);
+  private _eventChanged(ev: CustomEvent): void {
+    ev.stopPropagation();
+    fireEvent(this, "value-changed", {
+      value: { ...this.action, event: ev.detail.value },
+    });
   }
 }
 

@@ -6,14 +6,15 @@ import {
   css,
   CSSResult,
   html,
-  LitElement,
   internalProperty,
+  LitElement,
 } from "lit-element";
 import "../../../../components/dialog/ha-paper-dialog";
 import type { HaPaperDialog } from "../../../../components/dialog/ha-paper-dialog";
 import { showConfirmationDialog } from "../../../../dialogs/generic/show-dialog-box";
 import { haStyle } from "../../../../resources/styles";
 import { HomeAssistant } from "../../../../types";
+import { documentationUrl } from "../../../../util/documentation-url";
 import { WebhookDialogParams } from "./show-dialog-manage-cloudhook";
 
 const inputLabel = "Public URL – Click to copy to clipboard";
@@ -37,8 +38,11 @@ export class DialogManageCloudhook extends LitElement {
     const { webhook, cloudhook } = this._params;
     const docsUrl =
       webhook.domain === "automation"
-        ? "https://www.home-assistant.io/docs/automation/trigger/#webhook-trigger"
-        : `https://www.home-assistant.io/integrations/${webhook.domain}/`;
+        ? documentationUrl(
+            this.hass!,
+            "/docs/automation/trigger/#webhook-trigger"
+          )
+        : documentationUrl(this.hass!, `/integrations/${webhook.domain}/`);
     return html`
       <ha-paper-dialog with-backdrop>
         <h2>
@@ -115,8 +119,8 @@ export class DialogManageCloudhook extends LitElement {
       text: this.hass!.localize(
         "ui.panel.config.cloud.dialog_cloudhook.confirm_disable"
       ),
-      dismissText: this.hass!.localize("ui.common.no"),
-      confirmText: this.hass!.localize("ui.common.yes"),
+      dismissText: this.hass!.localize("ui.common.cancel"),
+      confirmText: this.hass!.localize("ui.common.disable"),
       confirm: () => {
         this._params!.disableHook();
         this._closeDialog();

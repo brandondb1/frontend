@@ -2,7 +2,7 @@ import { HassEntity } from "home-assistant-js-websocket";
 
 export const evaluateFilter = (stateObj: HassEntity, filter: any): boolean => {
   const operator = filter.operator || "==";
-  const value = filter.value || filter;
+  const value = filter.value ?? filter;
   const state = filter.attribute
     ? stateObj.attributes[filter.attribute]
     : stateObj.state;
@@ -21,13 +21,13 @@ export const evaluateFilter = (stateObj: HassEntity, filter: any): boolean => {
     case "!=":
       return state !== value;
     case "in":
-      if (Array.isArray(state) || typeof state === "string") {
-        return state.includes(value);
+      if (Array.isArray(value) || typeof value === "string") {
+        return value.includes(state);
       }
       return false;
     case "not in":
-      if (Array.isArray(state) || typeof state === "string") {
-        return !state.includes(value);
+      if (Array.isArray(value) || typeof value === "string") {
+        return !value.includes(state);
       }
       return false;
     case "regex": {

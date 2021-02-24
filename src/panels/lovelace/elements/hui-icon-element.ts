@@ -3,8 +3,8 @@ import {
   CSSResult,
   customElement,
   html,
-  LitElement,
   internalProperty,
+  LitElement,
   TemplateResult,
 } from "lit-element";
 import { ifDefined } from "lit-html/directives/if-defined";
@@ -25,10 +25,10 @@ export class HuiIconElement extends LitElement implements LovelaceElement {
 
   public setConfig(config: IconElementConfig): void {
     if (!config.icon) {
-      throw Error("Invalid Configuration: 'icon' required");
+      throw Error("Icon required");
     }
 
-    this._config = config;
+    this._config = { hold_action: { action: "more-info" }, ...config };
   }
 
   protected render(): TemplateResult {

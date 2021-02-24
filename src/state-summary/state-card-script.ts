@@ -1,18 +1,18 @@
 import "@material/mwc-button";
-import "../components/entity/ha-entity-toggle";
-import "../components/entity/state-info";
-import { HomeAssistant } from "../types";
+import { HassEntity } from "home-assistant-js-websocket";
 import {
-  html,
+  CSSResult,
   customElement,
+  html,
   LitElement,
   property,
-  CSSResult,
 } from "lit-element";
-import { HassEntity } from "home-assistant-js-websocket";
-import { haStyle } from "../resources/styles";
+import "../components/entity/ha-entity-toggle";
+import "../components/entity/state-info";
 import { UNAVAILABLE_STATES } from "../data/entity";
 import { canExcecute, ScriptEntity } from "../data/script";
+import { haStyle } from "../resources/styles";
+import { HomeAssistant } from "../types";
 
 @customElement("state-card-script")
 export class StateCardScript extends LitElement {
@@ -33,7 +33,8 @@ export class StateCardScript extends LitElement {
         ></state-info>
         ${stateObj.state === "on"
           ? html`<mwc-button @click=${this._cancelScript}>
-              ${(stateObj.attributes.current || 0) > 0
+              ${stateObj.attributes.mode !== "single" &&
+              (stateObj.attributes.current || 0) > 0
                 ? this.hass.localize(
                     "ui.card.script.cancel_multiple",
                     "number",

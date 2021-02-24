@@ -1,5 +1,3 @@
-import "../../../components/ha-icon-button";
-import "../../../components/ha-icon";
 import "@polymer/paper-item/paper-item";
 import "@polymer/paper-listbox/paper-listbox";
 import {
@@ -13,6 +11,8 @@ import {
 } from "lit-element";
 import { supportsFeature } from "../../../common/entity/supports-feature";
 import "../../../components/ha-attributes";
+import "../../../components/ha-icon";
+import "../../../components/ha-icon-button";
 import "../../../components/ha-paper-dropdown-menu";
 import {
   VacuumEntity,
@@ -68,7 +68,7 @@ const VACUUM_COMMANDS: VacuumCommand[] = [
   },
   {
     translationKey: "clean_spot",
-    icon: "hass:broom",
+    icon: "hass:target-variant",
     serviceName: "clean_spot",
     isVisible: (stateObj) =>
       supportsFeature(stateObj, VACUUM_SUPPORT_CLEAN_SPOT),
@@ -229,7 +229,6 @@ class MoreInfoVacuum extends LitElement {
   static get styles(): CSSResult {
     return css`
       :host {
-        @apply --paper-font-body1;
         line-height: 1.5;
       }
       .status-subtitle {

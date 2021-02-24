@@ -1,19 +1,20 @@
 import {
   HassEntityAttributeBase,
   HassEntityBase,
+  HassServiceTarget,
 } from "home-assistant-js-websocket";
 import { computeObjectId } from "../common/entity/compute_object_id";
 import { navigate } from "../common/navigate";
 import { HomeAssistant } from "../types";
-import { Condition } from "./automation";
+import { Condition, Trigger } from "./automation";
 
-export const MODES = ["single", "restart", "queued", "parallel"];
+export const MODES = ["single", "restart", "queued", "parallel"] as const;
 export const MODES_MAX = ["queued", "parallel"];
 
 export interface ScriptEntity extends HassEntityBase {
   attributes: HassEntityAttributeBase & {
     last_triggered: string;
-    mode: "single" | "restart" | "queued" | "parallel";
+    mode: typeof MODES[number];
     current?: number;
     max?: number;
   };
@@ -23,20 +24,21 @@ export interface ScriptConfig {
   alias: string;
   sequence: Action[];
   icon?: string;
-  mode?: "single" | "restart" | "queued" | "parallel";
+  mode?: typeof MODES[number];
   max?: number;
 }
 
 export interface EventAction {
   event: string;
-  event_data?: { [key: string]: any };
-  event_data_template?: { [key: string]: any };
+  event_data?: Record<string, any>;
+  event_data_template?: Record<string, any>;
 }
 
 export interface ServiceAction {
   service: string;
   entity_id?: string;
-  data?: { [key: string]: any };
+  target?: HassServiceTarget;
+  data?: Record<string, any>;
 }
 
 export interface DeviceAction {
@@ -45,8 +47,15 @@ export interface DeviceAction {
   entity_id: string;
 }
 
+export interface DelayActionParts {
+  milliseconds?: number;
+  seconds?: number;
+  minutes?: number;
+  hours?: number;
+  days?: number;
+}
 export interface DelayAction {
-  delay: number;
+  delay: number | Partial<DelayActionParts>;
 }
 
 export interface SceneAction {
@@ -56,6 +65,13 @@ export interface SceneAction {
 export interface WaitAction {
   wait_template: string;
   timeout?: number;
+  continue_on_timeout?: boolean;
+}
+
+export interface WaitForTriggerAction {
+  wait_for_trigger: Trigger[];
+  timeout?: number;
+  continue_on_timeout?: boolean;
 }
 
 export interface RepeatAction {
@@ -91,13 +107,14 @@ export type Action =
   | DelayAction
   | SceneAction
   | WaitAction
+  | WaitForTriggerAction
   | RepeatAction
   | ChooseAction;
 
 export const triggerScript = (
   hass: HomeAssistant,
   entityId: string,
-  variables?: {}
+  variables?: Record<string, unknown>
 ) => hass.callService("script", computeObjectId(entityId), variables);
 
 export const canExcecute = (state: ScriptEntity) => {

@@ -1,3 +1,4 @@
+import "@polymer/paper-item/paper-item-body";
 import {
   css,
   CSSResult,
@@ -5,9 +6,8 @@ import {
   html,
   LitElement,
   property,
-  SVGTemplateResult,
+  TemplateResult,
 } from "lit-element";
-import "@polymer/paper-item/paper-item-body";
 
 @customElement("ha-settings-row")
 export class HaSettingsRow extends LitElement {
@@ -16,20 +16,18 @@ export class HaSettingsRow extends LitElement {
   @property({ type: Boolean, attribute: "three-line" })
   public threeLine = false;
 
-  protected render(): SVGTemplateResult {
+  protected render(): TemplateResult {
     return html`
-      <style>
-        paper-item-body {
-          padding-right: 16px;
-        }
-      </style>
-      <paper-item-body
-        ?two-line=${!this.threeLine}
-        ?three-line=${this.threeLine}
-      >
-        <slot name="heading"></slot>
-        <div secondary><slot name="description"></slot></div>
-      </paper-item-body>
+      <div class="prefix-wrap">
+        <slot name="prefix"></slot>
+        <paper-item-body
+          ?two-line=${!this.threeLine}
+          ?three-line=${this.threeLine}
+        >
+          <slot name="heading"></slot>
+          <div secondary><slot name="description"></slot></div>
+        </paper-item-body>
+      </div>
       <slot></slot>
     `;
   }
@@ -43,11 +41,33 @@ export class HaSettingsRow extends LitElement {
         align-self: auto;
         align-items: center;
       }
+      paper-item-body {
+        padding: 8px 16px 8px 0;
+      }
+      paper-item-body[two-line] {
+        min-height: calc(
+          var(--paper-item-body-two-line-min-height, 72px) - 16px
+        );
+        flex: 1;
+      }
       :host([narrow]) {
         align-items: normal;
         flex-direction: column;
         border-top: 1px solid var(--divider-color);
         padding-bottom: 8px;
+      }
+      ::slotted(ha-switch) {
+        padding: 16px 0;
+      }
+      div[secondary] {
+        white-space: normal;
+      }
+      .prefix-wrap {
+        display: contents;
+      }
+      :host([narrow]) .prefix-wrap {
+        display: flex;
+        align-items: center;
       }
     `;
   }

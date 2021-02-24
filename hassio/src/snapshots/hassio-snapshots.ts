@@ -1,6 +1,12 @@
 import "@material/mwc-button";
 import "@material/mwc-icon-button";
-import { mdiPackageVariant, mdiPackageVariantClosed, mdiReload } from "@mdi/js";
+import { ActionDetail } from "@material/mwc-list/mwc-list-foundation";
+import "@material/mwc-list/mwc-list-item";
+import {
+  mdiDotsVertical,
+  mdiPackageVariant,
+  mdiPackageVariantClosed,
+} from "@mdi/js";
 import "@polymer/paper-checkbox/paper-checkbox";
 import type { PaperCheckboxElement } from "@polymer/paper-checkbox/paper-checkbox";
 import "@polymer/paper-input/paper-input";
@@ -13,15 +19,18 @@ import {
   CSSResultArray,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
-import { fireEvent } from "../../../src/common/dom/fire_event";
+import { atLeastVersion } from "../../../src/common/config/version";
+import "../../../src/components/buttons/ha-progress-button";
+import "../../../src/components/ha-button-menu";
 import "../../../src/components/ha-card";
 import "../../../src/components/ha-svg-icon";
+import { extractApiErrorMessage } from "../../../src/data/hassio/common";
 import {
   createHassioFullSnapshot,
   createHassioPartialSnapshot,
@@ -31,13 +40,16 @@ import {
   HassioSnapshot,
   reloadHassioSnapshots,
 } from "../../../src/data/hassio/snapshot";
-import { HassioSupervisorInfo } from "../../../src/data/hassio/supervisor";
+import { Supervisor } from "../../../src/data/supervisor/supervisor";
+import { showAlertDialog } from "../../../src/dialogs/generic/show-dialog-box";
 import "../../../src/layouts/hass-tabs-subpage";
 import { PolymerChangedEvent } from "../../../src/polymer-types";
 import { haStyle } from "../../../src/resources/styles";
 import { HomeAssistant, Route } from "../../../src/types";
 import "../components/hassio-card-content";
+import "../components/hassio-upload-snapshot";
 import { showHassioSnapshotDialog } from "../dialogs/snapshot/show-dialog-hassio-snapshot";
+import { showSnapshotUploadDialog } from "../dialogs/snapshot/show-dialog-snapshot-upload";
 import { supervisorTabs } from "../hassio-tabs";
 import { hassioStyle } from "../resources/hassio-style";
 
@@ -55,7 +67,7 @@ class HassioSnapshots extends LitElement {
 
   @property({ attribute: false }) public route!: Route;
 
-  @property({ attribute: false }) public supervisorInfo!: HassioSupervisorInfo;
+  @property({ attribute: false }) public supervisor!: Supervisor;
 
   @internalProperty() private _snapshotName = "";
 
@@ -77,10 +89,9 @@ class HassioSnapshots extends LitElement {
     },
     { slug: "ssl", name: "SSL", checked: true },
     { slug: "share", name: "Share", checked: true },
+    { slug: "media", name: "Media", checked: true },
     { slug: "addons/local", name: "Local add-ons", checked: true },
   ];
-
-  @internalProperty() private _creatingSnapshot = false;
 
   @internalProperty() private _error = "";
 
@@ -100,18 +111,27 @@ class HassioSnapshots extends LitElement {
         .tabs=${supervisorTabs}
       >
         <span slot="header">Snapshots</span>
-
-        <mwc-icon-button
+        <ha-button-menu
+          corner="BOTTOM_START"
           slot="toolbar-icon"
-          aria-label="Reload snapshots"
-          @click=${this.refreshData}
+          @action=${this._handleAction}
         >
-          <ha-svg-icon path=${mdiReload}></ha-svg-icon>
-        </mwc-icon-button>
+          <mwc-icon-button slot="trigger" alt="menu">
+            <ha-svg-icon .path=${mdiDotsVertical}></ha-svg-icon>
+          </mwc-icon-button>
+          <mwc-list-item>
+            Reload
+          </mwc-list-item>
+          ${atLeastVersion(this.hass.config.version, 0, 116)
+            ? html`<mwc-list-item>
+                Upload snapshot
+              </mwc-list-item>`
+            : ""}
+        </ha-button-menu>
 
         <div class="content">
           <h1>
-            Create snapshot
+            Create Snapshot
           </h1>
           <p class="description">
             Snapshots allow you to easily backup and restore all data of your
@@ -192,17 +212,20 @@ class HassioSnapshots extends LitElement {
                   : undefined}
               </div>
               <div class="card-actions">
-                <mwc-button
-                  .disabled=${this._creatingSnapshot}
+                <ha-progress-button
                   @click=${this._createSnapshot}
+                  title="${this.supervisor.info.state !== "running"
+                    ? `Creating a snapshot is not possible right now because the system is in ${this.supervisor.info.state} state.`
+                    : ""}"
+                  .disabled=${this.supervisor.info.state !== "running"}
                 >
                   Create
-                </mwc-button>
+                </ha-progress-button>
               </div>
             </ha-card>
           </div>
 
-          <h1>Available snapshots</h1>
+          <h1>Available Snapshots</h1>
           <div class="card-group">
             ${this._snapshots === undefined
               ? undefined
@@ -230,7 +253,7 @@ class HassioSnapshots extends LitElement {
                           .icon=${snapshot.type === "full"
                             ? mdiPackageVariantClosed
                             : mdiPackageVariant}
-                          .icon-class="snapshot"
+                          icon-class="snapshot"
                         ></hassio-card-content>
                       </div>
                     </ha-card>
@@ -244,18 +267,29 @@ class HassioSnapshots extends LitElement {
 
   protected firstUpdated(changedProps: PropertyValues) {
     super.firstUpdated(changedProps);
-    this._updateSnapshots();
+    this.refreshData();
   }
 
   protected updated(changedProps: PropertyValues) {
-    if (changedProps.has("supervisorInfo")) {
-      this._addonList = this.supervisorInfo.addons
+    if (changedProps.has("supervisor")) {
+      this._addonList = this.supervisor.supervisor.addons
         .map((addon) => ({
           slug: addon.slug,
           name: addon.name,
           checked: true,
         }))
         .sort((a, b) => (a.name < b.name ? -1 : 1));
+    }
+  }
+
+  private _handleAction(ev: CustomEvent<ActionDetail>) {
+    switch (ev.detail.index) {
+      case 0:
+        this.refreshData();
+        break;
+      case 1:
+        this._showUploadSnapshotDialog();
+        break;
     }
   }
 
@@ -293,17 +327,26 @@ class HassioSnapshots extends LitElement {
       this._snapshots = await fetchHassioSnapshots(this.hass);
       this._snapshots.sort((a, b) => (a.date < b.date ? 1 : -1));
     } catch (err) {
-      this._error = err.message;
+      this._error = extractApiErrorMessage(err);
     }
   }
 
-  private async _createSnapshot() {
+  private async _createSnapshot(ev: CustomEvent): Promise<void> {
+    if (this.supervisor.info.state !== "running") {
+      await showAlertDialog(this, {
+        title: "Could not create snapshot",
+        text: `Creating a snapshot is not possible right now because the system is in ${this.supervisor.info.state} state.`,
+      });
+    }
+    const button = ev.currentTarget as any;
+    button.progress = true;
+
     this._error = "";
     if (this._snapshotHasPassword && !this._snapshotPassword.length) {
       this._error = "Please enter a password.";
+      button.progress = false;
       return;
     }
-    this._creatingSnapshot = true;
     await this.updateComplete;
 
     const name =
@@ -341,12 +384,10 @@ class HassioSnapshots extends LitElement {
         await createHassioPartialSnapshot(this.hass, data);
       }
       this._updateSnapshots();
-      fireEvent(this, "hass-api-called", { success: true, response: null });
     } catch (err) {
-      this._error = err.message;
-    } finally {
-      this._creatingSnapshot = false;
+      this._error = extractApiErrorMessage(err);
     }
+    button.progress = false;
   }
 
   private _computeDetails(snapshot: HassioSnapshot) {
@@ -358,7 +399,20 @@ class HassioSnapshots extends LitElement {
   private _snapshotClicked(ev) {
     showHassioSnapshotDialog(this, {
       slug: ev.currentTarget!.snapshot.slug,
+      supervisor: this.supervisor,
       onDelete: () => this._updateSnapshots(),
+    });
+  }
+
+  private _showUploadSnapshotDialog() {
+    showSnapshotUploadDialog(this, {
+      showSnapshot: (slug: string) =>
+        showHassioSnapshotDialog(this, {
+          slug,
+          supervisor: this.supervisor,
+          onDelete: () => this._updateSnapshots(),
+        }),
+      reloadSnapshot: () => this.refreshData(),
     });
   }
 

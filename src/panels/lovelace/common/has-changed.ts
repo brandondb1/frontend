@@ -13,6 +13,7 @@ function hasConfigChanged(element: any, changedProps: PropertyValues): boolean {
   }
 
   if (
+    oldHass.connected !== element.hass!.connected ||
     oldHass.themes !== element.hass!.themes ||
     oldHass.language !== element.hass!.language ||
     oldHass.localize !== element.hass.localize ||
@@ -55,6 +56,7 @@ export function hasConfigOrEntitiesChanged(
 
   return entities.some(
     (entity) =>
+      "entity" in entity &&
       oldHass.states[entity.entity] !== element.hass!.states[entity.entity]
   );
 }

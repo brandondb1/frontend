@@ -1,1 +1,21 @@
-{}
+{
+    "ui": {
+        "panel": {
+            "config": {
+                "automation": {
+                    "editor": {
+                        "conditions": {
+                            "type": {
+                                "time": {
+                                    "weekdays": {
+                                        "mon": "Luns"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,7 @@
 import "@material/mwc-button";
-import { mdiDelete, mdiDownload, mdiHistory } from "@mdi/js";
-import { PaperCheckboxElement } from "@polymer/paper-checkbox/paper-checkbox";
+import { mdiClose, mdiDelete, mdiDownload, mdiHistory } from "@mdi/js";
+import "@polymer/paper-checkbox/paper-checkbox";
+import type { PaperCheckboxElement } from "@polymer/paper-checkbox/paper-checkbox";
 import "@polymer/paper-input/paper-input";
 import {
   css,
@@ -12,16 +13,22 @@ import {
   property,
   TemplateResult,
 } from "lit-element";
-import { createCloseHeading } from "../../../../src/components/ha-dialog";
+import { fireEvent } from "../../../../src/common/dom/fire_event";
+import "../../../../src/components/ha-header-bar";
 import "../../../../src/components/ha-svg-icon";
 import { getSignedPath } from "../../../../src/data/auth";
+import { extractApiErrorMessage } from "../../../../src/data/hassio/common";
 import {
   fetchHassioSnapshotInfo,
   HassioSnapshotDetail,
 } from "../../../../src/data/hassio/snapshot";
-import { showConfirmationDialog } from "../../../../src/dialogs/generic/show-dialog-box";
+import { Supervisor } from "../../../../src/data/supervisor/supervisor";
+import {
+  showAlertDialog,
+  showConfirmationDialog,
+} from "../../../../src/dialogs/generic/show-dialog-box";
 import { PolymerChangedEvent } from "../../../../src/polymer-types";
-import { haStyleDialog } from "../../../../src/resources/styles";
+import { haStyle, haStyleDialog } from "../../../../src/resources/styles";
 import { HomeAssistant } from "../../../../src/types";
 import { HassioSnapshotDialogParams } from "./show-dialog-hassio-snapshot";
 
@@ -72,7 +79,11 @@ interface FolderItem {
 class HassioSnapshotDialog extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
+  @property({ attribute: false }) public supervisor?: Supervisor;
+
   @internalProperty() private _error?: string;
+
+  @internalProperty() private _onboarding = false;
 
   @internalProperty() private _snapshot?: HassioSnapshotDetail;
 
@@ -89,13 +100,15 @@ class HassioSnapshotDialog extends LitElement {
   public async showDialog(params: HassioSnapshotDialogParams) {
     this._snapshot = await fetchHassioSnapshotInfo(this.hass, params.slug);
     this._folders = _computeFolders(
-      this._snapshot.folders
+      this._snapshot?.folders
     ).sort((a: FolderItem, b: FolderItem) => (a.name > b.name ? 1 : -1));
     this._addons = _computeAddons(
-      this._snapshot.addons
+      this._snapshot?.addons
     ).sort((a: AddonItem, b: AddonItem) => (a.name > b.name ? 1 : -1));
 
     this._dialogParams = params;
+    this._onboarding = params.onboarding ?? false;
+    this.supervisor = params.supervisor;
   }
 
   protected render(): TemplateResult {
@@ -103,12 +116,17 @@ class HassioSnapshotDialog extends LitElement {
       return html``;
     }
     return html`
-      <ha-dialog
-        open
-        stacked
-        @closing=${this._closeDialog}
-        .heading=${createCloseHeading(this.hass, this._computeName)}
-      >
+      <ha-dialog open @closing=${this._closeDialog} .heading=${true}>
+        <div slot="heading">
+          <ha-header-bar>
+            <span slot="title">
+              ${this._computeName}
+            </span>
+            <mwc-icon-button slot="actionItems" dialogAction="cancel">
+              <ha-svg-icon .path=${mdiClose}></ha-svg-icon>
+            </mwc-icon-button>
+          </ha-header-bar>
+        </div>
         <div class="details">
           ${this._snapshot.type === "full"
             ? "Full snapshot"
@@ -180,46 +198,57 @@ class HassioSnapshotDialog extends LitElement {
           : ""}
         ${this._error ? html` <p class="error">Error: ${this._error}</p> ` : ""}
 
-        <div>Actions:</div>
-
-        <mwc-button @click=${this._downloadClicked} slot="primaryAction">
-          <ha-svg-icon path=${mdiDownload} class="icon"></ha-svg-icon>
-          Download Snapshot
-        </mwc-button>
-
-        <mwc-button
-          @click=${this._partialRestoreClicked}
-          slot="secondaryAction"
-        >
-          <ha-svg-icon path=${mdiHistory} class="icon"></ha-svg-icon>
-          Restore Selected
-        </mwc-button>
-        ${this._snapshot.type === "full"
-          ? html`
-              <mwc-button
-                @click=${this._fullRestoreClicked}
-                slot="secondaryAction"
-              >
-                <ha-svg-icon path=${mdiHistory} class="icon"></ha-svg-icon>
-                Wipe &amp; restore
-              </mwc-button>
-            `
-          : ""}
-        <mwc-button @click=${this._deleteClicked} slot="secondaryAction">
-          <ha-svg-icon path=${mdiDelete} class="icon warning"></ha-svg-icon>
-          <span class="warning">Delete Snapshot</span>
-        </mwc-button>
+        <div class="button-row" slot="primaryAction">
+          <mwc-button @click=${this._partialRestoreClicked}>
+            <ha-svg-icon .path=${mdiHistory} class="icon"></ha-svg-icon>
+            Restore Selected
+          </mwc-button>
+          ${!this._onboarding
+            ? html`
+                <mwc-button @click=${this._deleteClicked}>
+                  <ha-svg-icon .path=${mdiDelete} class="icon warning">
+                  </ha-svg-icon>
+                  <span class="warning">Delete Snapshot</span>
+                </mwc-button>
+              `
+            : ""}
+        </div>
+        <div class="button-row" slot="secondaryAction">
+          ${this._snapshot.type === "full"
+            ? html`
+                <mwc-button @click=${this._fullRestoreClicked}>
+                  <ha-svg-icon .path=${mdiHistory} class="icon"></ha-svg-icon>
+                  Restore Everything
+                </mwc-button>
+              `
+            : ""}
+          ${!this._onboarding
+            ? html`<mwc-button @click=${this._downloadClicked}>
+                <ha-svg-icon .path=${mdiDownload} class="icon"></ha-svg-icon>
+                Download Snapshot
+              </mwc-button>`
+            : ""}
+        </div>
       </ha-dialog>
     `;
   }
 
   static get styles(): CSSResult[] {
     return [
+      haStyle,
       haStyleDialog,
       css`
         paper-checkbox {
           display: block;
           margin: 4px;
+        }
+        mwc-button ha-svg-icon {
+          margin-right: 4px;
+        }
+        .button-row {
+          display: grid;
+          gap: 8px;
+          margin-right: 8px;
         }
         .details {
           color: var(--secondary-text-color);
@@ -227,10 +256,6 @@ class HassioSnapshotDialog extends LitElement {
         .warning,
         .error {
           color: var(--error-color);
-        }
-        .buttons {
-          display: flex;
-          flex-direction: column;
         }
         .buttons li {
           list-style-type: none;
@@ -240,6 +265,18 @@ class HassioSnapshotDialog extends LitElement {
         }
         .no-margin-top {
           margin-top: 0;
+        }
+        ha-header-bar {
+          --mdc-theme-on-primary: var(--primary-text-color);
+          --mdc-theme-primary: var(--mdc-theme-surface);
+          flex-shrink: 0;
+        }
+        /* overrule the ha-style-dialog max-height on small screens */
+        @media all and (max-width: 450px), all and (max-height: 500px) {
+          ha-header-bar {
+            --mdc-theme-primary: var(--app-header-background-color);
+            --mdc-theme-on-primary: var(--app-header-text-color, white);
+          }
         }
       `,
     ];
@@ -269,8 +306,20 @@ class HassioSnapshotDialog extends LitElement {
 
   private async _partialRestoreClicked() {
     if (
+      this.supervisor !== undefined &&
+      this.supervisor.info.state !== "running"
+    ) {
+      await showAlertDialog(this, {
+        title: "Could not restore snapshot",
+        text: `Restoring a snapshot is not possible right now because the system is in ${this.supervisor.info.state} state.`,
+      });
+      return;
+    }
+    if (
       !(await showConfirmationDialog(this, {
         title: "Are you sure you want partially to restore this snapshot?",
+        confirmText: "restore",
+        dismissText: "cancel",
       }))
     ) {
       return;
@@ -299,29 +348,50 @@ class HassioSnapshotDialog extends LitElement {
       data.password = this._snapshotPassword;
     }
 
-    this.hass
-      .callApi(
-        "POST",
+    if (!this._onboarding) {
+      this.hass
+        .callApi(
+          "POST",
 
-        `hassio/snapshots/${this._snapshot!.slug}/restore/partial`,
-        data
-      )
-      .then(
-        () => {
-          alert("Snapshot restored!");
-          this._closeDialog();
-        },
-        (error) => {
-          this._error = error.body.message;
-        }
-      );
+          `hassio/snapshots/${this._snapshot!.slug}/restore/partial`,
+          data
+        )
+        .then(
+          () => {
+            alert("Snapshot restored!");
+            this._closeDialog();
+          },
+          (error) => {
+            this._error = error.body.message;
+          }
+        );
+    } else {
+      fireEvent(this, "restoring");
+      fetch(`/api/hassio/snapshots/${this._snapshot!.slug}/restore/partial`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      this._closeDialog();
+    }
   }
 
   private async _fullRestoreClicked() {
     if (
+      this.supervisor !== undefined &&
+      this.supervisor.info.state !== "running"
+    ) {
+      await showAlertDialog(this, {
+        title: "Could not restore snapshot",
+        text: `Restoring a snapshot is not possible right now because the system is in ${this.supervisor.info.state} state.`,
+      });
+      return;
+    }
+    if (
       !(await showConfirmationDialog(this, {
         title:
           "Are you sure you want to wipe your system and restore this snapshot?",
+        confirmText: "restore",
+        dismissText: "cancel",
       }))
     ) {
       return;
@@ -330,28 +400,38 @@ class HassioSnapshotDialog extends LitElement {
     const data = this._snapshot!.protected
       ? { password: this._snapshotPassword }
       : undefined;
-
-    this.hass
-      .callApi(
-        "POST",
-        `hassio/snapshots/${this._snapshot!.slug}/restore/full`,
-        data
-      )
-      .then(
-        () => {
-          alert("Snapshot restored!");
-          this._closeDialog();
-        },
-        (error) => {
-          this._error = error.body.message;
-        }
-      );
+    if (!this._onboarding) {
+      this.hass
+        .callApi(
+          "POST",
+          `hassio/snapshots/${this._snapshot!.slug}/restore/full`,
+          data
+        )
+        .then(
+          () => {
+            alert("Snapshot restored!");
+            this._closeDialog();
+          },
+          (error) => {
+            this._error = error.body.message;
+          }
+        );
+    } else {
+      fireEvent(this, "restoring");
+      fetch(`/api/hassio/snapshots/${this._snapshot!.slug}/restore/full`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      this._closeDialog();
+    }
   }
 
   private async _deleteClicked() {
     if (
       !(await showConfirmationDialog(this, {
         title: "Are you sure you want to delete this snapshot?",
+        confirmText: "delete",
+        dismissText: "cancel",
       }))
     ) {
       return;
@@ -362,7 +442,9 @@ class HassioSnapshotDialog extends LitElement {
       .callApi("POST", `hassio/snapshots/${this._snapshot!.slug}/remove`)
       .then(
         () => {
-          this._dialogParams!.onDelete();
+          if (this._dialogParams!.onDelete) {
+            this._dialogParams!.onDelete();
+          }
           this._closeDialog();
         },
         (error) => {
@@ -379,8 +461,21 @@ class HassioSnapshotDialog extends LitElement {
         `/api/hassio/snapshots/${this._snapshot!.slug}/download`
       );
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      alert(`Error: ${extractApiErrorMessage(err)}`);
       return;
+    }
+
+    if (window.location.href.includes("ui.nabu.casa")) {
+      const confirm = await showConfirmationDialog(this, {
+        title: "Potential slow download",
+        text:
+          "Downloading snapshots over the Nabu Casa URL will take some time, it is recomended to use your local URL instead, do you want to continue?",
+        confirmText: "continue",
+        dismissText: "cancel",
+      });
+      if (!confirm) {
+        return;
+      }
     }
 
     const name = this._computeName.replace(/[^a-z0-9]+/gi, "_");

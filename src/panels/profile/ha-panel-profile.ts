@@ -1,5 +1,4 @@
 import "@material/mwc-button";
-import "../../layouts/ha-app-layout";
 import "@polymer/app-layout/app-header/app-header";
 import "@polymer/app-layout/app-toolbar/app-toolbar";
 import "@polymer/paper-item/paper-item";
@@ -9,9 +8,9 @@ import {
   css,
   CSSResultArray,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   TemplateResult,
 } from "lit-element";
 import { fireEvent } from "../../common/dom/fire_event";
@@ -22,11 +21,14 @@ import {
   CoreFrontendUserData,
   getOptimisticFrontendUserDataCollection,
 } from "../../data/frontend";
+import { RefreshToken } from "../../data/refresh_token";
 import { showConfirmationDialog } from "../../dialogs/generic/show-dialog-box";
+import "../../layouts/ha-app-layout";
 import { haStyle } from "../../resources/styles";
 import { HomeAssistant } from "../../types";
 import "./ha-advanced-mode-row";
 import "./ha-change-password-card";
+import "./ha-enable-shortcuts-row";
 import "./ha-force-narrow-row";
 import "./ha-long-lived-access-tokens-card";
 import "./ha-mfa-modules-card";
@@ -35,15 +37,15 @@ import "./ha-pick-language-row";
 import "./ha-pick-theme-row";
 import "./ha-push-notifications-row";
 import "./ha-refresh-tokens-card";
-import "./ha-set-vibrate-row";
 import "./ha-set-suspend-row";
+import "./ha-set-vibrate-row";
 
 class HaPanelProfile extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @property() public narrow!: boolean;
+  @property({ type: Boolean }) public narrow!: boolean;
 
-  @internalProperty() private _refreshTokens?: unknown[];
+  @internalProperty() private _refreshTokens?: RefreshToken[];
 
   @internalProperty() private _coreUserData?: CoreFrontendUserData | null;
 
@@ -106,6 +108,23 @@ class HaPanelProfile extends LitElement {
               .narrow=${this.narrow}
               .hass=${this.hass}
             ></ha-pick-dashboard-row>
+            <ha-settings-row .narrow=${this.narrow}>
+              <span slot="heading">
+                ${this.hass.localize(
+                  "ui.panel.profile.customize_sidebar.header"
+                )}
+              </span>
+              <span slot="description">
+                ${this.hass.localize(
+                  "ui.panel.profile.customize_sidebar.description"
+                )}
+              </span>
+              <mwc-button @click=${this._customizeSidebar}>
+                ${this.hass.localize(
+                  "ui.panel.profile.customize_sidebar.button"
+                )}
+              </mwc-button>
+            </ha-settings-row>
             ${this.hass.dockedSidebar !== "auto" || !this.narrow
               ? html`
                   <ha-force-narrow-row
@@ -114,7 +133,7 @@ class HaPanelProfile extends LitElement {
                   ></ha-force-narrow-row>
                 `
               : ""}
-            ${navigator.vibrate
+            ${"vibrate" in navigator
               ? html`
                   <ha-set-vibrate-row
                     .narrow=${this.narrow}
@@ -143,7 +162,10 @@ class HaPanelProfile extends LitElement {
               .narrow=${this.narrow}
               .hass=${this.hass}
             ></ha-set-suspend-row>
-
+            <ha-enable-shortcuts-row
+              .narrow=${this.narrow}
+              .hass=${this.hass}
+            ></ha-enable-shortcuts-row>
             <div class="card-actions">
               <mwc-button class="warning" @click=${this._handleLogOut}>
                 ${this.hass.localize("ui.panel.profile.logout")}
@@ -180,6 +202,10 @@ class HaPanelProfile extends LitElement {
         </div>
       </ha-app-layout>
     `;
+  }
+
+  private _customizeSidebar() {
+    fireEvent(this, "hass-edit-sidebar", { editMode: true });
   }
 
   private async _refreshRefreshTokens() {

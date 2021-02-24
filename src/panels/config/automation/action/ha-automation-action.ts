@@ -18,6 +18,8 @@ import { HaDeviceAction } from "./types/ha-automation-action-device_id";
 export default class HaAutomationAction extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
+  @property({ type: Boolean }) public narrow = false;
+
   @property() public actions!: Action[];
 
   protected render() {
@@ -28,6 +30,8 @@ export default class HaAutomationAction extends LitElement {
             .index=${idx}
             .totalActions=${this.actions.length}
             .action=${action}
+            .narrow=${this.narrow}
+            @duplicate=${this._duplicateAction}
             @move-action=${this._move}
             @value-changed=${this._actionChanged}
             .hass=${this.hass}
@@ -76,6 +80,14 @@ export default class HaAutomationAction extends LitElement {
     }
 
     fireEvent(this, "value-changed", { value: actions });
+  }
+
+  private _duplicateAction(ev: CustomEvent) {
+    ev.stopPropagation();
+    const index = (ev.target as any).index;
+    fireEvent(this, "value-changed", {
+      value: this.actions.concat(this.actions[index]),
+    });
   }
 
   static get styles(): CSSResult {

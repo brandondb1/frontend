@@ -1,5 +1,5 @@
-import "@material/mwc-fab";
 import "@material/mwc-icon-button";
+import { ActionDetail } from "@material/mwc-list";
 import "@material/mwc-list/mwc-list-item";
 import { mdiDotsVertical, mdiPlus } from "@mdi/js";
 import "@polymer/app-route/app-route";
@@ -10,21 +10,24 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
+import { classMap } from "lit-html/directives/class-map";
 import memoizeOne from "memoize-one";
 import { HASSDomEvent } from "../../../common/dom/fire_event";
+import { navigate } from "../../../common/navigate";
 import "../../../common/search/search-input";
 import { caseInsensitiveCompare } from "../../../common/string/compare";
 import { LocalizeFunc } from "../../../common/translations/localize";
+import { extractSearchParam } from "../../../common/url/search-params";
 import { nextRender } from "../../../common/util/render-status";
-import "../../../components/entity/ha-state-icon";
 import "../../../components/ha-button-menu";
 import "../../../components/ha-card";
+import "../../../components/ha-fab";
 import "../../../components/ha-svg-icon";
 import {
   ConfigEntry,
@@ -32,6 +35,7 @@ import {
   getConfigEntries,
 } from "../../../data/config_entries";
 import {
+  ATTENTION_SOURCES,
   DISCOVERY_SOURCES,
   getConfigFlowInProgressCollection,
   ignoreConfigFlow,
@@ -59,6 +63,7 @@ import "../../../layouts/hass-tabs-subpage";
 import { SubscribeMixin } from "../../../mixins/subscribe-mixin";
 import { haStyle } from "../../../resources/styles";
 import { HomeAssistant, Route } from "../../../types";
+import { brandsUrl } from "../../../util/brands-url";
 import { configSections } from "../ha-panel-config";
 import "./ha-integration-card";
 import type {
@@ -117,6 +122,8 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
   };
 
   @internalProperty() private _showIgnored = false;
+
+  @internalProperty() private _showDisabled = false;
 
   @internalProperty() private _searchParms = new URLSearchParams(
     window.location.hash.substring(1)
@@ -177,18 +184,30 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     (
       configEntries: ConfigEntryExtended[],
       filter?: string
-    ): [Map<string, ConfigEntryExtended[]>, ConfigEntryExtended[]] => {
+    ): [
+      Map<string, ConfigEntryExtended[]>,
+      ConfigEntryExtended[],
+      Map<string, ConfigEntryExtended[]>
+    ] => {
       const filteredConfigEnties = this._filterConfigEntries(
         configEntries,
         filter
       );
       const ignored: ConfigEntryExtended[] = [];
+      const disabled: ConfigEntryExtended[] = [];
       for (let i = filteredConfigEnties.length - 1; i >= 0; i--) {
         if (filteredConfigEnties[i].source === "ignore") {
           ignored.push(filteredConfigEnties.splice(i, 1)[0]);
         }
+        if (filteredConfigEnties[i].disabled_by !== null) {
+          disabled.push(filteredConfigEnties.splice(i, 1)[0]);
+        }
       }
-      return [groupByIntegration(filteredConfigEnties), ignored];
+      return [
+        groupByIntegration(filteredConfigEnties),
+        ignored,
+        groupByIntegration(disabled),
+      ];
     }
   );
 
@@ -220,8 +239,15 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
   protected firstUpdated(changed: PropertyValues) {
     super.firstUpdated(changed);
     this._loadConfigEntries();
-    this.hass.loadBackendTranslation("title", undefined, true);
+    const localizePromise = this.hass.loadBackendTranslation(
+      "title",
+      undefined,
+      true
+    );
     this._fetchManifests();
+    if (this.route.path === "/add") {
+      this._handleAdd(localizePromise);
+    }
   }
 
   protected updated(changed: PropertyValues) {
@@ -243,6 +269,7 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     const [
       groupedConfigEntries,
       ignoredConfigEntries,
+      disabledConfigEntries,
     ] = this._filterGroupConfigEntries(this._configEntries, this._filter);
     const configEntriesInProgress = this._filterConfigEntriesInProgress(
       this._configEntriesInProgress,
@@ -278,20 +305,27 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
         <ha-button-menu
           corner="BOTTOM_START"
           slot="toolbar-icon"
-          @action=${this._toggleShowIgnored}
+          @action=${this._handleMenuAction}
         >
           <mwc-icon-button
             .title=${this.hass.localize("ui.common.menu")}
             .label=${this.hass.localize("ui.common.overflow_menu")}
             slot="trigger"
           >
-            <ha-svg-icon path=${mdiDotsVertical}></ha-svg-icon>
+            <ha-svg-icon .path=${mdiDotsVertical}></ha-svg-icon>
           </mwc-icon-button>
           <mwc-list-item>
             ${this.hass.localize(
               this._showIgnored
                 ? "ui.panel.config.integrations.ignore.hide_ignored"
                 : "ui.panel.config.integrations.ignore.show_ignored"
+            )}
+          </mwc-list-item>
+          <mwc-list-item>
+            ${this.hass.localize(
+              this._showDisabled
+                ? "ui.panel.config.integrations.disable.hide_disabled"
+                : "ui.panel.config.integrations.disable.show_disabled"
             )}
           </mwc-list-item>
         </ha-button-menu>
@@ -308,6 +342,20 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
                     "ui.panel.config.integrations.search"
                   )}
                 ></search-input>
+                ${!this._showDisabled && disabledConfigEntries.size
+                  ? html`<div class="active-filters">
+                      ${this.hass.localize(
+                        "ui.panel.config.integrations.disable.disabled_integrations",
+                        "number",
+                        disabledConfigEntries.size
+                      )}
+                      <mwc-button @click=${this._toggleShowDisabled}
+                        >${this.hass.localize(
+                          "ui.panel.config.filtering.show"
+                        )}</mwc-button
+                      >
+                    </div>`
+                  : ""}
               </div>
             `
           : ""}
@@ -329,14 +377,18 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
                     <div class="card-content">
                       <div class="image">
                         <img
-                          src="https://brands.home-assistant.io/${item.domain}/logo.png"
+                          src=${brandsUrl(item.domain, "logo")}
                           referrerpolicy="no-referrer"
                           @error=${this._onImageError}
                           @load=${this._onImageLoad}
                         />
                       </div>
                       <h2>
-                        ${item.localized_domain_name}
+                        ${// In 2020.2 we added support for item.title. All ignored entries before
+                        // that have title "Ignored" so we fallback to localized domain name.
+                        item.title === "Ignored"
+                          ? item.localized_domain_name
+                          : item.title}
                       </h2>
                       <mwc-button
                         @click=${this._removeIgnoredIntegration}
@@ -355,52 +407,82 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
             : ""}
           ${configEntriesInProgress.length
             ? configEntriesInProgress.map(
-                (flow: DataEntryFlowProgressExtended) => html`
-                  <ha-card outlined class="discovered">
-                    <div class="header">
-                      ${this.hass.localize(
-                        "ui.panel.config.integrations.discovered"
-                      )}
-                    </div>
-                    <div class="card-content">
-                      <div class="image">
-                        <img
-                          src="https://brands.home-assistant.io/${flow.handler}/logo.png"
-                          referrerpolicy="no-referrer"
-                          @error=${this._onImageError}
-                          @load=${this._onImageLoad}
-                        />
+                (flow: DataEntryFlowProgressExtended) => {
+                  const attention = ATTENTION_SOURCES.includes(
+                    flow.context.source
+                  );
+                  return html`
+                    <ha-card
+                      outlined
+                      class=${classMap({
+                        discovered: !attention,
+                        attention: attention,
+                      })}
+                    >
+                      <div class="header">
+                        ${this.hass.localize(
+                          `ui.panel.config.integrations.${
+                            attention ? "attention" : "discovered"
+                          }`
+                        )}
                       </div>
-                      <h2>
-                        ${flow.localized_title}
-                      </h2>
-                      <div>
-                        <mwc-button
-                          unelevated
-                          @click=${this._continueFlow}
-                          .flowId=${flow.flow_id}
-                        >
-                          ${this.hass.localize(
-                            "ui.panel.config.integrations.configure"
-                          )}
-                        </mwc-button>
-                        ${DISCOVERY_SOURCES.includes(flow.context.source) &&
-                        flow.context.unique_id
-                          ? html`
-                              <mwc-button
-                                @click=${this._ignoreFlow}
-                                .flow=${flow}
-                              >
-                                ${this.hass.localize(
-                                  "ui.panel.config.integrations.ignore.ignore"
-                                )}
-                              </mwc-button>
-                            `
-                          : ""}
+                      <div class="card-content">
+                        <div class="image">
+                          <img
+                            src=${brandsUrl(flow.handler, "logo")}
+                            referrerpolicy="no-referrer"
+                            @error=${this._onImageError}
+                            @load=${this._onImageLoad}
+                          />
+                        </div>
+                        <h2>
+                          ${flow.localized_title}
+                        </h2>
+                        <div>
+                          <mwc-button
+                            unelevated
+                            @click=${this._continueFlow}
+                            .flowId=${flow.flow_id}
+                          >
+                            ${this.hass.localize(
+                              `ui.panel.config.integrations.${
+                                attention ? "reconfigure" : "configure"
+                              }`
+                            )}
+                          </mwc-button>
+                          ${DISCOVERY_SOURCES.includes(flow.context.source) &&
+                          flow.context.unique_id
+                            ? html`
+                                <mwc-button
+                                  @click=${this._ignoreFlow}
+                                  .flow=${flow}
+                                >
+                                  ${this.hass.localize(
+                                    "ui.panel.config.integrations.ignore.ignore"
+                                  )}
+                                </mwc-button>
+                              `
+                            : ""}
+                        </div>
                       </div>
-                    </div>
-                  </ha-card>
-                `
+                    </ha-card>
+                  `;
+                }
+              )
+            : ""}
+          ${this._showDisabled
+            ? Array.from(disabledConfigEntries.entries()).map(
+                ([domain, items]) =>
+                  html`<ha-integration-card
+                    data-domain=${domain}
+                    disabled
+                    .hass=${this.hass}
+                    .domain=${domain}
+                    .items=${items}
+                    .manifest=${this._manifests[domain]}
+                    .entityRegistryEntries=${this._entityRegistryEntries}
+                    .deviceRegistryEntries=${this._deviceRegistryEntries}
+                  ></ha-integration-card> `
               )
             : ""}
           ${groupedConfigEntries.size
@@ -457,14 +539,16 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
               `
             : ""}
         </div>
-        <mwc-fab
+        <ha-fab
           slot="fab"
-          aria-label=${this.hass.localize("ui.panel.config.integrations.new")}
-          title=${this.hass.localize("ui.panel.config.integrations.new")}
+          .label=${this.hass.localize(
+            "ui.panel.config.integrations.add_integration"
+          )}
+          extended
           @click=${this._createFlow}
         >
-          <ha-svg-icon slot="icon" path=${mdiPlus}></ha-svg-icon>
-        </mwc-fab>
+          <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+        </ha-fab>
       </hass-tabs-subpage>
     `;
   }
@@ -512,11 +596,15 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     );
   }
 
+  private _handleFlowUpdated() {
+    this._loadConfigEntries();
+    getConfigFlowInProgressCollection(this.hass.connection).refresh();
+  }
+
   private _createFlow() {
     showConfigFlowDialog(this, {
       dialogClosedCallback: () => {
-        this._loadConfigEntries();
-        getConfigFlowInProgressCollection(this.hass.connection).refresh();
+        this._handleFlowUpdated();
       },
       showAdvanced: this.showAdvanced,
     });
@@ -528,8 +616,7 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     showConfigFlowDialog(this, {
       continueFlowId: (ev.target! as any).flowId,
       dialogClosedCallback: () => {
-        this._loadConfigEntries();
-        getConfigFlowInProgressCollection(this.hass.connection).refresh();
+        this._handleFlowUpdated();
       },
     });
   }
@@ -552,13 +639,32 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     if (!confirmed) {
       return;
     }
-    await ignoreConfigFlow(this.hass, flow.flow_id);
+    await ignoreConfigFlow(
+      this.hass,
+      flow.flow_id,
+      localizeConfigFlowTitle(this.hass.localize, flow)
+    );
     this._loadConfigEntries();
     getConfigFlowInProgressCollection(this.hass.connection).refresh();
   }
 
+  private _handleMenuAction(ev: CustomEvent<ActionDetail>) {
+    switch (ev.detail.index) {
+      case 0:
+        this._toggleShowIgnored();
+        break;
+      case 1:
+        this._toggleShowDisabled();
+        break;
+    }
+  }
+
   private _toggleShowIgnored() {
     this._showIgnored = !this._showIgnored;
+  }
+
+  private _toggleShowDisabled() {
+    this._showDisabled = !this._showDisabled;
   }
 
   private async _removeIgnoredIntegration(ev: Event) {
@@ -622,6 +728,33 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
     }
   }
 
+  private async _handleAdd(localizePromise: Promise<LocalizeFunc>) {
+    const domain = extractSearchParam("domain");
+    navigate(this, "/config/integrations", true);
+    if (!domain) {
+      return;
+    }
+    const localize = await localizePromise;
+    if (
+      !(await showConfirmationDialog(this, {
+        title: localize(
+          "ui.panel.config.integrations.confirm_new",
+          "integration",
+          domainToName(localize, domain)
+        ),
+      }))
+    ) {
+      return;
+    }
+    showConfigFlowDialog(this, {
+      dialogClosedCallback: () => {
+        this._handleFlowUpdated();
+      },
+      startFlowHandler: domain,
+      showAdvanced: this.hass.userData?.showAdvanced,
+    });
+  }
+
   static get styles(): CSSResult[] {
     return [
       haStyle,
@@ -638,6 +771,18 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+        }
+        .attention {
+          --ha-card-border-color: var(--error-color);
+        }
+        .attention .header {
+          background: var(--error-color);
+          color: var(--text-primary-color);
+          padding: 8px;
+          text-align: center;
+        }
+        .attention mwc-button {
+          --mdc-theme-primary: var(--error-color);
         }
         .discovered {
           --ha-card-border-color: var(--primary-color);
@@ -689,11 +834,14 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
           margin-left: 16px;
         }
         .search {
+          display: flex;
+          align-items: center;
           padding: 0 16px;
           background: var(--sidebar-background-color);
           border-bottom: 1px solid var(--divider-color);
         }
         .search search-input {
+          flex: 1;
           position: relative;
           top: 2px;
         }
@@ -710,6 +858,39 @@ class HaConfigIntegrations extends SubscribeMixin(LitElement) {
         }
         h2 {
           margin-top: 0;
+          word-wrap: break-word;
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 3;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: normal;
+        }
+        .active-filters {
+          color: var(--primary-text-color);
+          position: relative;
+          display: flex;
+          align-items: center;
+          padding: 2px 2px 2px 8px;
+          margin-left: 4px;
+          font-size: 14px;
+        }
+        .active-filters ha-icon {
+          color: var(--primary-color);
+        }
+        .active-filters mwc-button {
+          margin-left: 8px;
+        }
+        .active-filters::before {
+          background-color: var(--primary-color);
+          opacity: 0.12;
+          border-radius: 4px;
+          position: absolute;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          content: "";
         }
       `,
     ];

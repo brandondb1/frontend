@@ -1,9 +1,9 @@
 import {
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
@@ -16,9 +16,9 @@ import { actionHandler } from "../common/directives/action-handler-directive";
 import { handleAction } from "../common/handle-action";
 import { hasAction } from "../common/has-action";
 import { hasConfigOrEntityChanged } from "../common/has-changed";
+import { createEntityNotFoundWarning } from "../components/hui-warning";
 import "../components/hui-warning-element";
 import { LovelaceElement, StateBadgeElementConfig } from "./types";
-import { createEntityNotFoundWarning } from "../components/hui-warning";
 
 @customElement("hui-state-badge-element")
 export class HuiStateBadgeElement extends LitElement
@@ -29,10 +29,10 @@ export class HuiStateBadgeElement extends LitElement
 
   public setConfig(config: StateBadgeElementConfig): void {
     if (!config.entity) {
-      throw Error("Invalid Configuration: 'entity' required");
+      throw Error("Entity required");
     }
 
-    this._config = config;
+    this._config = { hold_action: { action: "more-info" }, ...config };
   }
 
   protected shouldUpdate(changedProps: PropertyValues): boolean {

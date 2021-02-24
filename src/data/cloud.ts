@@ -9,14 +9,14 @@ interface CloudStatusBase {
 }
 
 export interface GoogleEntityConfig {
-  should_expose?: boolean;
+  should_expose?: boolean | null;
   override_name?: string;
   aliases?: string[];
   disable_2fa?: boolean;
 }
 
 export interface AlexaEntityConfig {
-  should_expose?: boolean;
+  should_expose?: boolean | null;
 }
 
 export interface CertificateInformation {
@@ -31,14 +31,17 @@ export interface CloudPreferences {
   remote_enabled: boolean;
   google_secure_devices_pin: string | undefined;
   cloudhooks: { [webhookId: string]: CloudWebhook };
+  google_default_expose: string[] | null;
   google_entity_configs: {
     [entityId: string]: GoogleEntityConfig;
   };
+  alexa_default_expose: string[] | null;
   alexa_entity_configs: {
     [entityId: string]: AlexaEntityConfig;
   };
   alexa_report_state: boolean;
   google_report_state: boolean;
+  tts_default_voice: [string, string];
 }
 
 export type CloudStatusLoggedIn = CloudStatusBase & {
@@ -106,9 +109,12 @@ export const updateCloudPref = (
   prefs: {
     google_enabled?: CloudPreferences["google_enabled"];
     alexa_enabled?: CloudPreferences["alexa_enabled"];
+    alexa_default_expose?: CloudPreferences["alexa_default_expose"];
     alexa_report_state?: CloudPreferences["alexa_report_state"];
     google_report_state?: CloudPreferences["google_report_state"];
+    google_default_expose?: CloudPreferences["google_default_expose"];
     google_secure_devices_pin?: CloudPreferences["google_secure_devices_pin"];
+    tts_default_voice?: CloudPreferences["tts_default_voice"];
   }
 ) =>
   hass.callWS({
@@ -140,3 +146,10 @@ export const updateCloudAlexaEntityConfig = (
     entity_id: entityId,
     ...values,
   });
+
+export interface CloudTTSInfo {
+  languages: Array<[string, string]>;
+}
+
+export const getCloudTTSInfo = (hass: HomeAssistant) =>
+  hass.callWS<CloudTTSInfo>({ type: "cloud/tts/info" });

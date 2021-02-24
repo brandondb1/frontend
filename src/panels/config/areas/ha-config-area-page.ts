@@ -4,9 +4,9 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   TemplateResult,
 } from "lit-element";
 import { ifDefined } from "lit-html/directives/if-defined";
@@ -81,7 +81,8 @@ class HaConfigAreaPage extends LitElement {
     if (!area) {
       return html`
         <hass-error-screen
-          error="${this.hass.localize("ui.panel.config.areas.area_not_found")}"
+          .hass=${this.hass}
+          .error=${this.hass.localize("ui.panel.config.areas.area_not_found")}
         ></hass-error-screen>
       `;
     }
@@ -175,8 +176,8 @@ class HaConfigAreaPage extends LitElement {
                                   </a>
                                   ${!state.attributes.id
                                     ? html`
-                                        <paper-tooltip
-                                          >${this.hass.localize(
+                                        <paper-tooltip animation-delay="0">
+                                          ${this.hass.localize(
                                             "ui.panel.config.devices.cant_edit"
                                           )}
                                         </paper-tooltip>
@@ -228,8 +229,8 @@ class HaConfigAreaPage extends LitElement {
                                   </a>
                                   ${!state.attributes.id
                                     ? html`
-                                        <paper-tooltip
-                                          >${this.hass.localize(
+                                        <paper-tooltip animation-delay="0">
+                                          ${this.hass.localize(
                                             "ui.panel.config.devices.cant_edit"
                                           )}
                                         </paper-tooltip>
@@ -261,11 +262,7 @@ class HaConfigAreaPage extends LitElement {
                           return state
                             ? html`
                                 <a
-                                  href=${ifDefined(
-                                    state.attributes.id
-                                      ? `/config/script/edit/${state.attributes.id}`
-                                      : undefined
-                                  )}
+                                  href=${`/config/script/edit/${state.entity_id}`}
                                 >
                                   <paper-item>
                                     <paper-item-body>
@@ -316,8 +313,8 @@ class HaConfigAreaPage extends LitElement {
             text: this.hass.localize(
               "ui.panel.config.areas.delete.confirmation_text"
             ),
-            dismissText: this.hass.localize("ui.common.no"),
-            confirmText: this.hass.localize("ui.common.yes"),
+            dismissText: this.hass.localize("ui.common.cancel"),
+            confirmText: this.hass.localize("ui.common.delete"),
           }))
         ) {
           return false;
@@ -382,6 +379,7 @@ class HaConfigAreaPage extends LitElement {
 
         paper-item {
           cursor: pointer;
+          font-size: var(--paper-font-body1_-_font-size);
         }
 
         a {

@@ -4,9 +4,9 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
@@ -18,6 +18,8 @@ import { computeStateName } from "../../common/entity/compute_state_name";
 import { domainIcon } from "../../common/entity/domain_icon";
 import { stateIcon } from "../../common/entity/state_icon";
 import { timerTimeRemaining } from "../../common/entity/timer_time_remaining";
+import { formatNumber } from "../../common/string/format_number";
+import { UNAVAILABLE, UNKNOWN } from "../../data/entity";
 import { HomeAssistant } from "../../types";
 import "../ha-label-badge";
 
@@ -81,7 +83,8 @@ export class HaStateLabelBadge extends LitElement {
           ? ""
           : this.image
           ? this.image
-          : state.attributes.entity_picture_local || state.attributes.entity_picture}"
+          : state.attributes.entity_picture_local ||
+            state.attributes.entity_picture}"
         .label="${this._computeLabel(domain, state, this._timerTimeRemaining)}"
         .description="${this.name ? this.name : computeStateName(state)}"
       ></ha-label-badge>
@@ -108,10 +111,12 @@ export class HaStateLabelBadge extends LitElement {
         return null;
       case "sensor":
       default:
-        return state.state === "unknown"
+        return state.attributes.device_class === "moon__phase"
+          ? null
+          : state.state === UNKNOWN
           ? "-"
           : state.attributes.unit_of_measurement
-          ? state.state
+          ? formatNumber(state.state, this.hass!.language)
           : computeStateDisplay(
               this.hass!.localize,
               state,
@@ -121,7 +126,7 @@ export class HaStateLabelBadge extends LitElement {
   }
 
   private _computeIcon(domain: string, state: HassEntity) {
-    if (state.state === "unavailable") {
+    if (state.state === UNAVAILABLE) {
       return null;
     }
     switch (domain) {
@@ -145,28 +150,27 @@ export class HaStateLabelBadge extends LitElement {
           return "hass:alert-circle";
         }
         // state == 'disarmed'
-        return domainIcon(domain, state.state);
+        return domainIcon(domain, state);
       case "binary_sensor":
       case "device_tracker":
       case "updater":
       case "person":
-        return stateIcon(state);
       case "sun":
-        return state.state === "above_horizon"
-          ? domainIcon(domain)
-          : "hass:brightness-3";
+        return stateIcon(state);
       case "timer":
         return state.state === "active"
           ? "hass:timer-outline"
           : "hass:timer-off-outline";
       default:
-        return null;
+        return state?.attributes.device_class === "moon__phase"
+          ? stateIcon(state)
+          : null;
     }
   }
 
   private _computeLabel(domain, state, _timerTimeRemaining) {
     if (
-      state.state === "unavailable" ||
+      state.state === UNAVAILABLE ||
       ["device_tracker", "alarm_control_panel", "person"].includes(domain)
     ) {
       // Localize the state with a special state_badge namespace, which has variations of

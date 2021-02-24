@@ -1,6 +1,7 @@
+import "@material/mwc-button/mwc-button";
+import { mdiCheckCircle, mdiCircle, mdiCloseCircle, mdiZWave } from "@mdi/js";
 import "@polymer/paper-item/paper-icon-item";
 import "@polymer/paper-item/paper-item-body";
-import "@material/mwc-fab";
 import {
   css,
   CSSResultArray,
@@ -14,20 +15,20 @@ import {
 import { navigate } from "../../../../../common/navigate";
 import "../../../../../components/ha-card";
 import "../../../../../components/ha-icon-next";
+import {
+  fetchOZWInstances,
+  networkOfflineStatuses,
+  networkOnlineStatuses,
+  networkStartingStatuses,
+  OZWInstance,
+} from "../../../../../data/ozw";
+import "../../../../../layouts/hass-error-screen";
+import "../../../../../layouts/hass-loading-screen";
+import "../../../../../layouts/hass-tabs-subpage";
+import type { PageNavigation } from "../../../../../layouts/hass-tabs-subpage";
 import { haStyle } from "../../../../../resources/styles";
 import type { HomeAssistant, Route } from "../../../../../types";
 import "../../../ha-config-section";
-import { mdiCircle, mdiCheckCircle, mdiCloseCircle, mdiZWave } from "@mdi/js";
-import "../../../../../layouts/hass-tabs-subpage";
-import type { PageNavigation } from "../../../../../layouts/hass-tabs-subpage";
-import "@material/mwc-button/mwc-button";
-import {
-  OZWInstance,
-  fetchOZWInstances,
-  networkOnlineStatuses,
-  networkOfflineStatuses,
-  networkStartingStatuses,
-} from "../../../../../data/ozw";
 
 export const ozwTabs: PageNavigation[] = [];
 
@@ -43,27 +44,26 @@ class OZWConfigDashboard extends LitElement {
 
   @property() public configEntryId?: string;
 
-  @internalProperty() private _instances: OZWInstance[] = [];
+  @internalProperty() private _instances?: OZWInstance[];
 
-  public connectedCallback(): void {
-    super.connectedCallback();
-    if (this.hass) {
-      this._fetchData();
-    }
-  }
-
-  private async _fetchData() {
-    this._instances = await fetchOZWInstances(this.hass!);
-    if (this._instances.length === 1) {
-      navigate(
-        this,
-        `/config/ozw/network/${this._instances[0].ozw_instance}`,
-        true
-      );
-    }
+  protected firstUpdated() {
+    this._fetchData();
   }
 
   protected render(): TemplateResult {
+    if (!this._instances) {
+      return html`<hass-loading-screen></hass-loading-screen>`;
+    }
+
+    if (this._instances.length === 0) {
+      return html`<hass-error-screen
+        .hass=${this.hass}
+        .error=${this.hass.localize(
+          "ui.panel.config.ozw.select_instance.none_found"
+        )}
+      ></hass-error-screen>`;
+    }
+
     return html`
       <hass-tabs-subpage
         .hass=${this.hass}
@@ -142,10 +142,21 @@ class OZWConfigDashboard extends LitElement {
                   `;
                 })}
               `
-            : ``}
+            : ""}
         </ha-config-section>
       </hass-tabs-subpage>
     `;
+  }
+
+  private async _fetchData() {
+    this._instances = await fetchOZWInstances(this.hass!);
+    if (this._instances.length === 1) {
+      navigate(
+        this,
+        `/config/ozw/network/${this._instances[0].ozw_instance}`,
+        true
+      );
+    }
   }
 
   static get styles(): CSSResultArray {

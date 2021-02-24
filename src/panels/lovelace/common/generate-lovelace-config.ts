@@ -1,5 +1,4 @@
 import {
-  HassConfig,
   HassEntities,
   HassEntity,
   STATE_NOT_RUNNING,
@@ -14,6 +13,7 @@ import { splitByGroups } from "../../../common/entity/split_by_groups";
 import { compare } from "../../../common/string/compare";
 import { LocalizeFunc } from "../../../common/translations/localize";
 import { subscribeOne } from "../../../common/util/subscribe-one";
+import { isComponentLoaded } from "../../../common/config/is_component_loaded";
 import {
   AreaRegistryEntry,
   subscribeAreaRegistry,
@@ -26,6 +26,7 @@ import {
   EntityRegistryEntry,
   subscribeEntityRegistry,
 } from "../../../data/entity_registry";
+import { GroupEntity } from "../../../data/group";
 import { domainToName } from "../../../data/integration";
 import {
   LovelaceCardConfig,
@@ -33,7 +34,7 @@ import {
   LovelaceViewConfig,
 } from "../../../data/lovelace";
 import { SENSOR_DEVICE_CLASS_BATTERY } from "../../../data/sensor";
-import { GroupEntity, HomeAssistant } from "../../../types";
+import { HomeAssistant } from "../../../types";
 import {
   AlarmPanelCardConfig,
   EntitiesCardConfig,
@@ -42,18 +43,9 @@ import {
   PictureEntityCardConfig,
   ThermostatCardConfig,
 } from "../cards/types";
-import { processEditorEntities } from "../editor/process-editor-entities";
 import { LovelaceRowConfig } from "../entity-rows/types";
 
 const DEFAULT_VIEW_ENTITY_ID = "group.default_view";
-const DOMAINS_BADGES = [
-  "binary_sensor",
-  "mailbox",
-  "person",
-  "sensor",
-  "sun",
-  "timer",
-];
 const HIDE_DOMAIN = new Set([
   "automation",
   "configurator",
@@ -62,6 +54,8 @@ const HIDE_DOMAIN = new Set([
   "persistent_notification",
   "zone",
 ]);
+
+const HIDE_PLATFORM = new Set(["mobile_app"]);
 
 let subscribedRegistries = false;
 
@@ -88,10 +82,12 @@ const splitByAreas = (
     );
     for (const entity of entityEntries) {
       if (
-        areaDevices.has(
+        ((areaDevices.has(
           // @ts-ignore
           entity.device_id
         ) &&
+          !entity.area_id) ||
+          entity.area_id === area.area_id) &&
         entity.entity_id in allEntities
       ) {
         areaEntities.push(allEntities[entity.entity_id]);
@@ -171,6 +167,7 @@ export const computeCards = (
       const cardConfig = {
         type: "weather-forecast",
         entity: entityId,
+        show_forecast: false,
       };
       cards.push(cardConfig);
     } else if (
@@ -187,7 +184,7 @@ export const computeCards = (
         (name = computeStateName(stateObj)).startsWith(titlePrefix)
           ? {
               entity: entityId,
-              name: name.substr(titlePrefix.length),
+              name: adjustName(name.substr(titlePrefix.length)),
             }
           : entityId;
 
@@ -206,11 +203,35 @@ export const computeCards = (
   return cards;
 };
 
-const computeDefaultViewStates = (entities: HassEntities): HassEntities => {
+const hasUpperCase = (str: string): boolean => {
+  return str.toLowerCase() !== str;
+};
+
+const adjustName = (name: string): string => {
+  // If first word already has an upper case letter (e.g. from brand name)
+  // leave as-is, otherwise capitalize the first word.
+  return hasUpperCase(name.substr(0, name.indexOf(" ")))
+    ? name
+    : name[0].toUpperCase() + name.slice(1);
+};
+
+const computeDefaultViewStates = (
+  entities: HassEntities,
+  entityEntries: EntityRegistryEntry[]
+): HassEntities => {
   const states = {};
+  const hiddenEntities = new Set(
+    entityEntries
+      .filter((entry) => HIDE_PLATFORM.has(entry.platform))
+      .map((entry) => entry.entity_id)
+  );
+
   Object.keys(entities).forEach((entityId) => {
     const stateObj = entities[entityId];
-    if (!HIDE_DOMAIN.has(computeStateDomain(stateObj))) {
+    if (
+      !HIDE_DOMAIN.has(computeStateDomain(stateObj)) &&
+      !hiddenEntities.has(stateObj.entity_id)
+    ) {
       states[entityId] = entities[entityId];
     }
   });
@@ -230,30 +251,18 @@ const generateViewConfig = (
     (gr1, gr2) => groupOrders[gr1.entity_id] - groupOrders[gr2.entity_id]
   );
 
-  const badgeEntities: { [domain: string]: string[] } = {};
   const ungroupedEntitites: { [domain: string]: string[] } = {};
 
-  // Organize ungrouped entities in badges/ungrouped things
+  // Organize ungrouped entities in ungrouped things
   Object.keys(splitted.ungrouped).forEach((entityId) => {
     const state = splitted.ungrouped[entityId];
     const domain = computeStateDomain(state);
 
-    const coll = DOMAINS_BADGES.includes(domain)
-      ? badgeEntities
-      : ungroupedEntitites;
-
-    if (!(domain in coll)) {
-      coll[domain] = [];
+    if (!(domain in ungroupedEntitites)) {
+      ungroupedEntitites[domain] = [];
     }
 
-    coll[domain].push(state.entity_id);
-  });
-
-  let badges: string[] = [];
-  DOMAINS_BADGES.forEach((domain) => {
-    if (domain in badgeEntities) {
-      badges = badges.concat(badgeEntities[domain]);
-    }
+    ungroupedEntitites[domain].push(state.entity_id);
   });
 
   let cards: LovelaceCardConfig[] = [];
@@ -299,7 +308,6 @@ const generateViewConfig = (
   const view: LovelaceViewConfig = {
     path,
     title,
-    badges: processEditorEntities(badges),
     cards,
   };
 
@@ -317,7 +325,7 @@ export const generateDefaultViewConfig = (
   entities: HassEntities,
   localize: LocalizeFunc
 ): LovelaceViewConfig => {
-  const states = computeDefaultViewStates(entities);
+  const states = computeDefaultViewStates(entities, entityEntries);
   const path = "default_view";
   const title = "Home";
   const icon = undefined;
@@ -366,16 +374,16 @@ export const generateDefaultViewConfig = (
 };
 
 export const generateLovelaceConfigFromData = async (
-  config: HassConfig,
+  hass: HomeAssistant,
   areaEntries: AreaRegistryEntry[],
   deviceEntries: DeviceRegistryEntry[],
   entityEntries: EntityRegistryEntry[],
   entities: HassEntities,
   localize: LocalizeFunc
 ): Promise<LovelaceConfig> => {
-  if (config.safe_mode) {
+  if (hass.config.safe_mode) {
     return {
-      title: config.location_name,
+      title: hass.config.location_name,
       views: [
         {
           cards: [{ type: "safe-mode" }],
@@ -405,7 +413,7 @@ export const generateLovelaceConfigFromData = async (
     );
   });
 
-  let title = config.location_name;
+  let title = hass.config.location_name;
 
   // User can override default view. If they didn't, we will add one
   // that contains all entities.
@@ -424,7 +432,7 @@ export const generateLovelaceConfigFromData = async (
     );
 
     // Add map of geo locations to default view if loaded
-    if (config.components.includes("geo_location")) {
+    if (isComponentLoaded(hass, "geo_location")) {
       if (views[0] && views[0].cards) {
         views[0].cards.push({
           type: "map",
@@ -494,7 +502,7 @@ export const generateLovelaceConfigFromHass = async (
   ]);
 
   return generateLovelaceConfigFromData(
-    hass.config,
+    hass,
     areaEntries,
     deviceEntries,
     entityEntries,

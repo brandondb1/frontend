@@ -7,13 +7,14 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   PropertyValues,
   TemplateResult,
 } from "lit-element";
 import "web-animations-js/web-animations-next-lite.min";
+import "../../../../src/components/buttons/ha-progress-button";
 import "../../../../src/components/ha-card";
 import {
   HassioAddonDetails,
@@ -91,7 +92,9 @@ class HassioAddonAudio extends LitElement {
           </paper-dropdown-menu>
         </div>
         <div class="card-actions">
-          <mwc-button @click=${this._saveSettings}>Save</mwc-button>
+          <ha-progress-button @click=${this._saveSettings}>
+            Save
+          </ha-progress-button>
         </div>
       </ha-card>
     `;
@@ -172,7 +175,10 @@ class HassioAddonAudio extends LitElement {
     }
   }
 
-  private async _saveSettings(): Promise<void> {
+  private async _saveSettings(ev: CustomEvent): Promise<void> {
+    const button = ev.currentTarget as any;
+    button.progress = true;
+
     this._error = undefined;
     const data: HassioAddonSetOptionParams = {
       audio_input:
@@ -182,12 +188,14 @@ class HassioAddonAudio extends LitElement {
     };
     try {
       await setHassioAddonOption(this.hass, this.addon.slug, data);
+      if (this.addon?.state === "started") {
+        await suggestAddonRestart(this, this.hass, this.addon);
+      }
     } catch {
       this._error = "Failed to set addon audio device";
     }
-    if (!this._error && this.addon?.state === "started") {
-      await suggestAddonRestart(this, this.hass, this.addon);
-    }
+
+    button.progress = false;
   }
 }
 

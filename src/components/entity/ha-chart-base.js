@@ -71,13 +71,24 @@ class HaChartBase extends mixinBehaviors(
           margin: 5px 0 0 0;
           width: 100%;
         }
+        .chartTooltip ul {
+          margin: 0 3px;
+        }
         .chartTooltip li {
           display: block;
           white-space: pre-line;
         }
+        .chartTooltip li::first-line {
+          line-height: 0;
+        }
         .chartTooltip .title {
           text-align: center;
           font-weight: 500;
+        }
+        .chartTooltip .beforeBody {
+          text-align: center;
+          font-weight: 300;
+          word-break: break-all;
         }
         .chartLegend li {
           display: inline-block;
@@ -133,6 +144,9 @@ class HaChartBase extends mixinBehaviors(
           style$="opacity:[[tooltip.opacity]]; top:[[tooltip.top]]; left:[[tooltip.left]]; padding:[[tooltip.yPadding]]px [[tooltip.xPadding]]px"
         >
           <div class="title">[[tooltip.title]]</div>
+          <template is="dom-if" if="[[tooltip.beforeBody]]">
+            <div class="beforeBody">[[tooltip.beforeBody]]</div>
+          </template>
           <div>
             <ul>
               <template is="dom-repeat" items="[[tooltip.lines]]">
@@ -216,9 +230,7 @@ class HaChartBase extends mixinBehaviors(
     }
 
     if (scriptsLoaded === null) {
-      scriptsLoaded = import(
-        /* webpackChunkName: "load_chart" */ "../../resources/ha-chart-scripts.js"
-      );
+      scriptsLoaded = import("../../resources/ha-chart-scripts.js");
     }
     scriptsLoaded.then((ChartModule) => {
       this.ChartClass = ChartModule.default;
@@ -263,6 +275,10 @@ class HaChartBase extends mixinBehaviors(
 
     const title = tooltip.title ? tooltip.title[0] || "" : "";
     this.set(["tooltip", "title"], title);
+
+    if (tooltip.beforeBody) {
+      this.set(["tooltip", "beforeBody"], tooltip.beforeBody.join("\n"));
+    }
 
     const bodyLines = tooltip.body.map((n) => n.lines);
 
@@ -622,8 +638,14 @@ class HaChartBase extends mixinBehaviors(
       const name = data[3];
       if (name === null) return Color().hsl(0, 40, 38);
       if (name === undefined) return Color().hsl(120, 40, 38);
-      const name1 = name.toLowerCase();
+      let name1 = name.toLowerCase();
       if (ret === undefined) {
+        if (data[4]) {
+          // Invert on/off if data[4] is true. Required for some binary_sensor device classes
+          // (BINARY_SENSOR_DEVICE_CLASS_COLOR_INVERTED) where "off" is the good (= green color) value.
+          name1 = name1 === "on" ? "off" : name1 === "off" ? "on" : name1;
+        }
+
         ret = colorDict[name1];
       }
       if (ret === undefined) {

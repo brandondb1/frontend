@@ -1,14 +1,14 @@
 /* eslint-disable no-console */
+import { UpdatingElement } from "lit-element";
+import { HASSDomEvent } from "../common/dom/fire_event";
 import {
   closeDialog,
-  showDialog,
-  DialogState,
   DialogClosedParams,
+  DialogState,
+  showDialog,
 } from "../dialogs/make-dialog-manager";
-import { Constructor } from "../types";
-import { HASSDomEvent } from "../common/dom/fire_event";
-import { UpdatingElement } from "lit-element";
 import { ProvideHassElement } from "../mixins/provide-hass-lit-mixin";
+import { Constructor } from "../types";
 
 const DEBUG = false;
 
@@ -56,6 +56,14 @@ export const urlSyncMixin = <
 
         private _popstateChangeListener = (ev: PopStateEvent) => {
           if (this._ignoreNextPopState) {
+            if (ev.state?.oldState?.replaced) {
+              // if the previous dialog was replaced, and the current dialog is closed, we should also remove the replaced dialog from history
+              if (DEBUG) {
+                console.log("remove old state", ev.state.oldState);
+              }
+              history.back();
+              return;
+            }
             this._ignoreNextPopState = false;
             return;
           }

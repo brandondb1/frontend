@@ -1,12 +1,13 @@
-import "../../../components/ha-icon-button";
+import "@material/mwc-icon-button";
+import { mdiHelpCircle, mdiPlus } from "@mdi/js";
 import "@polymer/paper-tooltip/paper-tooltip";
 import {
+  CSSResult,
   customElement,
   html,
   LitElement,
   property,
   TemplateResult,
-  CSSResult,
 } from "lit-element";
 import { ifDefined } from "lit-html/directives/if-defined";
 import memoizeOne from "memoize-one";
@@ -14,30 +15,28 @@ import { isComponentLoaded } from "../../../common/config/is_component_loaded";
 import { formatDateTime } from "../../../common/datetime/format_date_time";
 import { fireEvent } from "../../../common/dom/fire_event";
 import { computeStateName } from "../../../common/entity/compute_state_name";
+import { navigate } from "../../../common/navigate";
 import { DataTableColumnContainer } from "../../../components/data-table/ha-data-table";
 import "../../../components/entity/ha-entity-toggle";
-import "@material/mwc-fab";
-import {
-  AutomationConfig,
-  AutomationEntity,
-  showAutomationEditor,
-  triggerAutomation,
-} from "../../../data/automation";
+import "../../../components/ha-fab";
+import "../../../components/ha-svg-icon";
+import { AutomationEntity, triggerAutomation } from "../../../data/automation";
+import { UNAVAILABLE_STATES } from "../../../data/entity";
+import { showAlertDialog } from "../../../dialogs/generic/show-dialog-box";
 import "../../../layouts/hass-tabs-subpage-data-table";
 import { haStyle } from "../../../resources/styles";
 import { HomeAssistant, Route } from "../../../types";
+import { documentationUrl } from "../../../util/documentation-url";
 import { configSections } from "../ha-panel-config";
-import { showThingtalkDialog } from "./show-dialog-thingtalk";
-import "../../../components/ha-svg-icon";
-import { mdiPlus } from "@mdi/js";
+import { showNewAutomationDialog } from "./show-dialog-new-automation";
 
 @customElement("ha-automation-picker")
 class HaAutomationPicker extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @property() public isWide!: boolean;
+  @property({ type: Boolean }) public isWide!: boolean;
 
-  @property() public narrow!: boolean;
+  @property({ type: Boolean }) public narrow!: boolean;
 
   @property() public route!: Route;
 
@@ -58,7 +57,7 @@ class HaAutomationPicker extends LitElement {
         toggle: {
           title: "",
           type: "icon",
-          template: (_toggle, automation) =>
+          template: (_toggle, automation: any) =>
             html`
               <ha-entity-toggle
                 .hass=${this.hass}
@@ -91,10 +90,11 @@ class HaAutomationPicker extends LitElement {
       if (!narrow) {
         columns.execute = {
           title: "",
-          template: (_info, automation) => html`
+          template: (_info, automation: any) => html`
             <mwc-button
               .automation=${automation}
               @click=${(ev) => this._execute(ev)}
+              .disabled=${UNAVAILABLE_STATES.includes(automation.state)}
             >
               ${this.hass.localize("ui.card.automation.trigger")}
             </mwc-button>
@@ -132,13 +132,13 @@ class HaAutomationPicker extends LitElement {
                 : "hass:pencil-off"}
               .disabled=${!automation.attributes.id}
               title="${this.hass.localize(
-                "ui.panel.config.automation.picker.show_info_automation"
+                "ui.panel.config.automation.picker.edit_automation"
               )}"
             ></ha-icon-button>
           </a>
           ${!automation.attributes.id
             ? html`
-                <paper-tooltip position="left">
+                <paper-tooltip animation-delay="0" position="left">
                   ${this.hass.localize(
                     "ui.panel.config.automation.picker.only_editable"
                   )}
@@ -167,15 +167,19 @@ class HaAutomationPicker extends LitElement {
         )}
         hasFab
       >
-        <mwc-fab
+        <mwc-icon-button slot="toolbar-icon" @click=${this._showHelp}>
+          <ha-svg-icon .path=${mdiHelpCircle}></ha-svg-icon>
+        </mwc-icon-button>
+        <ha-fab
           slot="fab"
-          title=${this.hass.localize(
+          .label=${this.hass.localize(
             "ui.panel.config.automation.picker.add_automation"
           )}
+          extended
           @click=${this._createNew}
         >
-          <ha-svg-icon slot="icon" path=${mdiPlus}></ha-svg-icon>
-        </mwc-fab>
+          <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+        </ha-fab>
       </hass-tabs-subpage-data-table>
     `;
   }
@@ -186,20 +190,40 @@ class HaAutomationPicker extends LitElement {
     fireEvent(this, "hass-more-info", { entityId });
   }
 
+  private _showHelp() {
+    showAlertDialog(this, {
+      title: this.hass.localize("ui.panel.config.automation.caption"),
+      text: html`
+        ${this.hass.localize("ui.panel.config.automation.picker.introduction")}
+        <p>
+          <a
+            href="${documentationUrl(this.hass, "/docs/automation/editor/")}"
+            target="_blank"
+            rel="noreferrer"
+          >
+            ${this.hass.localize(
+              "ui.panel.config.automation.picker.learn_more"
+            )}
+          </a>
+        </p>
+      `,
+    });
+  }
+
   private _execute(ev) {
     const entityId = ev.currentTarget.automation.entity_id;
     triggerAutomation(this.hass, entityId);
   }
 
   private _createNew() {
-    if (!isComponentLoaded(this.hass, "cloud")) {
-      showAutomationEditor(this);
-      return;
+    if (
+      isComponentLoaded(this.hass, "cloud") ||
+      isComponentLoaded(this.hass, "blueprint")
+    ) {
+      showNewAutomationDialog(this);
+    } else {
+      navigate(this, "/config/automation/edit/new");
     }
-    showThingtalkDialog(this, {
-      callback: (config: Partial<AutomationConfig> | undefined) =>
-        showAutomationEditor(this, config),
-    });
   }
 
   static get styles(): CSSResult {

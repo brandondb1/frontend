@@ -11,13 +11,14 @@ import {
 } from "lit-element";
 import "../../../components/ha-relative-time";
 import { triggerAutomation } from "../../../data/automation";
+import { UNAVAILABLE_STATES } from "../../../data/entity";
 import { HomeAssistant } from "../../../types";
 
 @customElement("more-info-automation")
 class MoreInfoAutomation extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
 
-  @property() public stateObj?: HassEntity;
+  @property({ attribute: false }) public stateObj?: HassEntity;
 
   protected render(): TemplateResult {
     if (!this.hass || !this.stateObj) {
@@ -34,7 +35,10 @@ class MoreInfoAutomation extends LitElement {
       </div>
 
       <div class="actions">
-        <mwc-button @click=${this.handleAction}>
+        <mwc-button
+          @click=${this.handleAction}
+          .disabled=${UNAVAILABLE_STATES.includes(this.stateObj!.state)}
+        >
           ${this.hass.localize("ui.card.automation.trigger")}
         </mwc-button>
       </div>
@@ -52,8 +56,10 @@ class MoreInfoAutomation extends LitElement {
         justify-content: space-between;
       }
       .actions {
-        margin: 36px 0 8px 0;
-        text-align: right;
+        margin: 8px 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
       }
     `;
   }

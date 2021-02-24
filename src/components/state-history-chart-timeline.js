@@ -3,9 +3,26 @@ import { html } from "@polymer/polymer/lib/utils/html-tag";
 /* eslint-plugin-disable lit */
 import { PolymerElement } from "@polymer/polymer/polymer-element";
 import { formatDateTimeWithSeconds } from "../common/datetime/format_date_time";
+import { computeDomain } from "../common/entity/compute_domain";
 import { computeRTL } from "../common/util/compute_rtl";
 import LocalizeMixin from "../mixins/localize-mixin";
 import "./entity/ha-chart-base";
+
+/** Binary sensor device classes for which the static colors for on/off need to be inverted.
+ *  List the ones were "off" = good or normal state = should be rendered "green".
+ */
+const BINARY_SENSOR_DEVICE_CLASS_COLOR_INVERTED = new Set([
+  "battery",
+  "door",
+  "garage_door",
+  "gas",
+  "lock",
+  "opening",
+  "problem",
+  "safety",
+  "smoke",
+  "window",
+]);
 
 class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
   static get template() {
@@ -76,6 +93,8 @@ class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
     const staticColors = {
       on: 1,
       off: 0,
+      home: 1,
+      not_home: 0,
       unavailable: "#a0a0a0",
       unknown: "#606060",
       idle: 2,
@@ -127,6 +146,12 @@ class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
       let prevLastChanged = startTime;
       const entityDisplay = names[stateInfo.entity_id] || stateInfo.name;
 
+      const invertOnOff =
+        computeDomain(stateInfo.entity_id) === "binary_sensor" &&
+        BINARY_SENSOR_DEVICE_CLASS_COLOR_INVERTED.has(
+          this.hass.states[stateInfo.entity_id].attributes.device_class
+        );
+
       const dataRow = [];
       stateInfo.data.forEach((state) => {
         let newState = state.state;
@@ -142,7 +167,13 @@ class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
         if (prevState !== null && newState !== prevState) {
           newLastChanged = new Date(state.last_changed);
 
-          dataRow.push([prevLastChanged, newLastChanged, locState, prevState]);
+          dataRow.push([
+            prevLastChanged,
+            newLastChanged,
+            locState,
+            prevState,
+            invertOnOff,
+          ]);
 
           prevState = newState;
           locState = state.state_localize;
@@ -155,9 +186,15 @@ class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
       });
 
       if (prevState !== null) {
-        dataRow.push([prevLastChanged, endTime, locState, prevState]);
+        dataRow.push([
+          prevLastChanged,
+          endTime,
+          locState,
+          prevState,
+          invertOnOff,
+        ]);
       }
-      datasets.push({ data: dataRow });
+      datasets.push({ data: dataRow, entity_id: stateInfo.entity_id });
       labels.push(entityDisplay);
     });
 
@@ -171,12 +208,22 @@ class StateHistoryChartTimeline extends LocalizeMixin(PolymerElement) {
       return [state, start, end];
     };
 
+    const formatTooltipBeforeBody = (item, data) => {
+      if (!this.hass.userData || !this.hass.userData.showAdvanced || !item[0]) {
+        return "";
+      }
+      // Extract the entity ID from the dataset.
+      const values = data.datasets[item[0].datasetIndex];
+      return values.entity_id || "";
+    };
+
     const chartOptions = {
       type: "timeline",
       options: {
         tooltips: {
           callbacks: {
             label: formatTooltipLabel,
+            beforeBody: formatTooltipBeforeBody,
           },
         },
         scales: {

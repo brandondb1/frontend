@@ -4,11 +4,14 @@ import "../entity-rows/hui-script-entity-row";
 import "../entity-rows/hui-sensor-entity-row";
 import "../entity-rows/hui-text-entity-row";
 import "../entity-rows/hui-toggle-entity-row";
-import { EntityConfig } from "../entity-rows/types";
+import { LovelaceRowConfig } from "../entity-rows/types";
 import "../special-rows/hui-attribute-row";
 import "../special-rows/hui-button-row";
 import "../special-rows/hui-call-service-row";
-import { createLovelaceElement } from "./create-element-base";
+import {
+  createLovelaceElement,
+  getLovelaceElementClass,
+} from "./create-element-base";
 
 const ALWAYS_LOADED_TYPES = new Set([
   "media-player-entity",
@@ -24,6 +27,7 @@ const LAZY_LOAD_TYPES = {
   "climate-entity": () => import("../entity-rows/hui-climate-entity-row"),
   "cover-entity": () => import("../entity-rows/hui-cover-entity-row"),
   "group-entity": () => import("../entity-rows/hui-group-entity-row"),
+  "humidifier-entity": () => import("../entity-rows/hui-humidifier-entity-row"),
   "input-datetime-entity": () =>
     import("../entity-rows/hui-input-datetime-entity-row"),
   "input-number-entity": () =>
@@ -32,6 +36,7 @@ const LAZY_LOAD_TYPES = {
     import("../entity-rows/hui-input-select-entity-row"),
   "input-text-entity": () => import("../entity-rows/hui-input-text-entity-row"),
   "lock-entity": () => import("../entity-rows/hui-lock-entity-row"),
+  "number-entity": () => import("../entity-rows/hui-number-entity-row"),
   "timer-entity": () => import("../entity-rows/hui-timer-entity-row"),
   conditional: () => import("../special-rows/hui-conditional-row"),
   "weather-entity": () => import("../entity-rows/hui-weather-entity-row"),
@@ -51,7 +56,7 @@ const DOMAIN_TO_ELEMENT_TYPE = {
   cover: "cover",
   fan: "toggle",
   group: "group",
-  humidifier: "toggle",
+  humidifier: "humidifier",
   input_boolean: "toggle",
   input_number: "input-number",
   input_select: "input-select",
@@ -59,6 +64,7 @@ const DOMAIN_TO_ELEMENT_TYPE = {
   light: "toggle",
   lock: "lock",
   media_player: "media-player",
+  number: "number",
   remote: "toggle",
   scene: "scene",
   script: "script",
@@ -67,13 +73,13 @@ const DOMAIN_TO_ELEMENT_TYPE = {
   switch: "toggle",
   vacuum: "toggle",
   // Temporary. Once climate is rewritten,
-  // water heater should get it's own row.
+  // water heater should get its own row.
   water_heater: "climate",
   input_datetime: "input-datetime",
   weather: "weather",
 };
 
-export const createRowElement = (config: EntityConfig) =>
+export const createRowElement = (config: LovelaceRowConfig) =>
   createLovelaceElement(
     "row",
     config,
@@ -82,3 +88,12 @@ export const createRowElement = (config: EntityConfig) =>
     DOMAIN_TO_ELEMENT_TYPE,
     undefined
   );
+
+export const getRowElementClass = (type: string) => {
+  return getLovelaceElementClass(
+    type,
+    "row",
+    ALWAYS_LOADED_TYPES,
+    LAZY_LOAD_TYPES
+  );
+};

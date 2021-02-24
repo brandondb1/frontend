@@ -1,3 +1,4 @@
+import { mdiPlus } from "@mdi/js";
 import "@polymer/paper-item/paper-item";
 import "@polymer/paper-item/paper-item-body";
 import {
@@ -16,7 +17,9 @@ import {
   DataTableColumnContainer,
   RowClickedEvent,
 } from "../../../components/data-table/ha-data-table";
-import "@material/mwc-fab";
+import "../../../components/ha-fab";
+import "../../../components/ha-icon-button";
+import "../../../components/ha-svg-icon";
 import {
   AreaRegistryEntry,
   createAreaRegistryEntry,
@@ -26,8 +29,6 @@ import {
   devicesInArea,
 } from "../../../data/device_registry";
 import { showAlertDialog } from "../../../dialogs/generic/show-dialog-box";
-import "../../../components/ha-icon-button";
-import "../../../components/ha-svg-icon";
 import "../../../layouts/hass-loading-screen";
 import "../../../layouts/hass-tabs-subpage-data-table";
 import { HomeAssistant, Route } from "../../../types";
@@ -37,7 +38,6 @@ import {
   loadAreaRegistryDetailDialog,
   showAreaRegistryDetailDialog,
 } from "./show-dialog-area-registry-detail";
-import { mdiPlus } from "@mdi/js";
 
 @customElement("ha-config-areas-dashboard")
 export class HaConfigAreasDashboard extends LitElement {
@@ -117,21 +117,23 @@ export class HaConfigAreasDashboard extends LitElement {
         )}
         id="area_id"
         hasFab
+        clickable
       >
         <ha-icon-button
           slot="toolbar-icon"
           icon="hass:help-circle"
           @click=${this._showHelp}
         ></ha-icon-button>
-        <mwc-fab
+        <ha-fab
           slot="fab"
-          title="${this.hass.localize(
+          .label=${this.hass.localize(
             "ui.panel.config.areas.picker.create_area"
-          )}"
+          )}
+          extended
           @click=${this._createArea}
         >
-          <ha-svg-icon slot="icon" path=${mdiPlus}></ha-svg-icon>
-        </mwc-fab>
+          <ha-svg-icon slot="icon" .path=${mdiPlus}></ha-svg-icon>
+        </ha-fab>
       </hass-tabs-subpage-data-table>
     `;
   }

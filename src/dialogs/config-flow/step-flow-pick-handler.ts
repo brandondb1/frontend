@@ -6,9 +6,9 @@ import {
   CSSResult,
   customElement,
   html,
+  internalProperty,
   LitElement,
   property,
-  internalProperty,
   TemplateResult,
 } from "lit-element";
 import { classMap } from "lit-html/directives/class-map";
@@ -20,7 +20,8 @@ import { LocalizeFunc } from "../../common/translations/localize";
 import "../../components/ha-icon-next";
 import { domainToName } from "../../data/integration";
 import { HomeAssistant } from "../../types";
-import { FlowConfig } from "./show-dialog-data-entry-flow";
+import { brandsUrl } from "../../util/brands-url";
+import { documentationUrl } from "../../util/documentation-url";
 import { configFlowContentStyles } from "./styles";
 
 interface HandlerObj {
@@ -28,17 +29,24 @@ interface HandlerObj {
   slug: string;
 }
 
+declare global {
+  // for fire event
+  interface HASSDomEvents {
+    "handler-picked": {
+      handler: string;
+    };
+  }
+}
+
 @customElement("step-flow-pick-handler")
 class StepFlowPickHandler extends LitElement {
-  public flowConfig!: FlowConfig;
-
   @property({ attribute: false }) public hass!: HomeAssistant;
 
   @property() public handlers!: string[];
 
   @property() public showAdvanced?: boolean;
 
-  @internalProperty() private filter?: string;
+  @internalProperty() private _filter?: string;
 
   private _width?: number;
 
@@ -72,7 +80,7 @@ class StepFlowPickHandler extends LitElement {
   protected render(): TemplateResult {
     const handlers = this._getHandlers(
       this.handlers,
-      this.filter,
+      this._filter,
       this.hass.localize
     );
 
@@ -80,7 +88,7 @@ class StepFlowPickHandler extends LitElement {
       <h2>${this.hass.localize("ui.panel.config.integrations.new")}</h2>
       <search-input
         autofocus
-        .filter=${this.filter}
+        .filter=${this._filter}
         @value-changed=${this._filterChanged}
         .label=${this.hass.localize("ui.panel.config.integrations.search")}
       ></search-input>
@@ -101,7 +109,7 @@ class StepFlowPickHandler extends LitElement {
                 <img
                   slot="item-icon"
                   loading="lazy"
-                  src="https://brands.home-assistant.io/_/${handler.slug}/icon.png"
+                  src=${brandsUrl(handler.slug, "icon", true)}
                   referrerpolicy="no-referrer"
                 />
 
@@ -122,7 +130,7 @@ class StepFlowPickHandler extends LitElement {
               ${this.hass.localize(
                 "ui.panel.config.integrations.note_about_website_reference"
               )}<a
-                href="https://www.home-assistant.io/integrations/"
+                href="${documentationUrl(this.hass, "/integrations/")}"
                 target="_blank"
                 rel="noreferrer"
                 >${this.hass.localize(
@@ -162,15 +170,12 @@ class StepFlowPickHandler extends LitElement {
   }
 
   private async _filterChanged(e) {
-    this.filter = e.detail.value;
+    this._filter = e.detail.value;
   }
 
   private async _handlerPicked(ev) {
-    fireEvent(this, "flow-update", {
-      stepPromise: this.flowConfig.createFlow(
-        this.hass,
-        ev.currentTarget.handler.slug
-      ),
+    fireEvent(this, "handler-picked", {
+      handler: ev.currentTarget.handler.slug,
     });
   }
 
@@ -192,6 +197,9 @@ class StepFlowPickHandler extends LitElement {
         div {
           overflow: auto;
           max-height: 600px;
+        }
+        h2 {
+          padding-right: 66px;
         }
         @media all and (max-height: 900px) {
           div {
