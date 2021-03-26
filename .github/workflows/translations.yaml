@@ -2,7 +2,7 @@ name: Translations
 
 on:
   schedule:
-    - cron: "30 0 * * *"
+    - cron: "30 0 2 1 *"
   push:
     branches:
       - dev
